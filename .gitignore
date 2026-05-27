@@ -2,3 +2,13 @@ swa-release-1.0.4/
 .playwright-mcp/
 .superpowers/
 .DS_Store
+
+# M1 additions
+.envrc
+platform/terraform/.terraform/
+platform/terraform/.terraform.lock.hcl
+platform/terraform/terraform.tfstate
+platform/terraform/terraform.tfstate.backup
+platform/terraform/.terraform.tfstate.lock.info
+platform/terraform/SCHEMA.md
+platform/helm/*.values.yaml

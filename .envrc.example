@@ -1,0 +1,10 @@
+# .envrc.example — copy to .envrc and fill in. .envrc is gitignored.
+# Only non-secret env lives here. Secrets are read from macOS Keychain via
+# Conceal at infamousdev/claudecode/client_id|secret, injected into
+# tenant-touching commands via `summon -p conceal_summon`.
+
+# Secrets Manager SaaS tenant subdomain (without `.secretsmgr.cyberark.cloud`):
+export PANW_SM_TENANT=infamous
+
+# Optional — kind cluster name (default "swa"):
+# export KIND_CLUSTER=swa
