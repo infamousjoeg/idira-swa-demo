@@ -68,11 +68,15 @@ tf-init: install-tf-provider ## terraform init (after provider is installed)
 # echoed on the command line (visible to `ps`); summon injects the underlying
 # CLIENT_ID/CLIENT_SECRET from Keychain via conceal_summon.
 tf-apply-platform: _check-env tf-init ## Apply TF subset #1: SPIFFE hierarchy + server registration
+	@# var.sm_url is required by 30-jwt-authn.tf (M2). Even though we use
+	@# -target to constrain *this* apply to the four SPIFFE resources, TF still
+	@# validates every variable in the root module — so sm_url must be set.
 	@$(SUMMON) -- bash -c '\
 	  set -euo pipefail; \
 	  tok=$$(./scripts/get-sm-token.sh); \
 	  CONJUR_APPLIANCE_URL=$(PANW_SM_URL) CONJUR_AUTHN_TOKEN=$$tok \
 	    $(TF) apply -auto-approve \
+	      -var sm_url=$(PANW_SM_URL) \
 	      -target=swa_trust_domain.idira \
 	      -target=swa_server_group.kind_sg \
 	      -target=swa_node_group.kind_ng \

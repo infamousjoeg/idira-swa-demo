@@ -55,3 +55,23 @@ workload:
 # node_group name (swa_node_group.kind_ng.name = "kind-ng").
 podLabels:
   swa_nodegroup: kind-ng
+
+# M2: enable the k8s workload attestor and skip kubelet TLS verification.
+#
+# The carrier (and any other workload pod) calls the Workload API socket;
+# the agent then needs to identify the calling pod by querying the local
+# kubelet at https://<node>:10250/pods. On a kind node the kubelet uses a
+# self-signed cert, so verification fails with "x509: certificate signed by
+# unknown authority" and the agent returns "failed to attest workload" —
+# which the carrier surfaces as "agent unreachable".
+#
+# skipKubeletVerification: true short-circuits the verify step. Safe for a
+# laptop demo (the kubelet is on the same node, only reachable via
+# hostNetwork). Production would set kubeletCAPath to the cluster CA bundle
+# instead. Verified empirically 2026-05-27 — without this, the agent's
+# trace event payload is the x509 error verbatim.
+workloadAttestors:
+  - type: k8s
+    config:
+      skipKubeletVerification: true
+      nodeNameEnv: MY_NODE_NAME
