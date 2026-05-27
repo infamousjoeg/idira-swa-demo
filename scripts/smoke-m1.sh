@@ -27,6 +27,12 @@
 #      `/api/swa/trust-domains/<name>` (no `/v1/` prefix), even though
 #      server-group endpoints DO use `/api/swa/v1/...`. The SM REST surface
 #      is not uniformly versioned.
+#
+#   5. Time-sensitive checks (DS readiness, ServerCaBundleUploaded,
+#      SVIDIssued) are wrapped in bounded retry loops. `helm --wait`
+#      returns when pods report Ready, but SWA's control-plane round
+#      trips fire a few seconds AFTER pod readiness; without retries
+#      `make up-m1 && make smoke-m1` races and intermittently fails.
 
 set -euo pipefail
 
@@ -39,38 +45,61 @@ step() { printf '\n== %s ==\n' "$*"; }
 ok()   { printf '  [ok]   %s\n' "$*"; }
 err()  { printf '  [FAIL] %s\n' "$*"; fail=$((fail+1)); }
 
+# wait_until <max_seconds> <bash_test_expression>
+# Re-evaluates the test every 2 s; returns 0 the first time it succeeds,
+# 1 if the deadline passes without success. The test is plain bash —
+# anything `if <expr>; then ...` would accept.
+wait_until() {
+  local max=$1; shift
+  local deadline=$((SECONDS + max))
+  while (( SECONDS < deadline )); do
+    if eval "$*" >/dev/null 2>&1; then return 0; fi
+    sleep 2
+  done
+  return 1
+}
+
 # ---- Cluster-side checks (no tenant credentials needed) ---------------------
 
 step 'swa-server deployment ready'
-ready=$(kubectl -n "$ns" get deploy swa-server -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo 0)
-[[ "$ready" == "1" ]] && ok "readyReplicas=1" || err "readyReplicas=$ready"
+if wait_until 60 'kubectl -n '"$ns"' rollout status deploy/swa-server --timeout=2s'; then
+  ready=$(kubectl -n "$ns" get deploy swa-server -o jsonpath='{.status.readyReplicas}')
+  [[ "$ready" == "1" ]] && ok "readyReplicas=1" || err "readyReplicas=$ready"
+else
+  err 'deploy/swa-server not ready within 60s'
+fi
 
 step 'swa-agent daemonset desired==ready'
-desired=$(kubectl -n "$ns" get ds swa-agent -o jsonpath='{.status.desiredNumberScheduled}' 2>/dev/null || echo 0)
-ready=$(  kubectl -n "$ns" get ds swa-agent -o jsonpath='{.status.numberReady}' 2>/dev/null || echo 0)
-[[ "$desired" == "$ready" && "$ready" != "0" ]] \
-  && ok "desired=$desired ready=$ready" \
-  || err "desired=$desired ready=$ready"
+# DaemonSets don't get a `rollout status` ready until numberReady ==
+# desiredNumberScheduled; poll explicitly so we can surface both numbers
+# in the error message.
+if wait_until 60 '[[ "$(kubectl -n '"$ns"' get ds swa-agent -o jsonpath={.status.desiredNumberScheduled})" == "$(kubectl -n '"$ns"' get ds swa-agent -o jsonpath={.status.numberReady})" && "$(kubectl -n '"$ns"' get ds swa-agent -o jsonpath={.status.numberReady})" != "0" ]]'; then
+  desired=$(kubectl -n "$ns" get ds swa-agent -o jsonpath='{.status.desiredNumberScheduled}')
+  ready=$(  kubectl -n "$ns" get ds swa-agent -o jsonpath='{.status.numberReady}')
+  ok "desired=$desired ready=$ready"
+else
+  desired=$(kubectl -n "$ns" get ds swa-agent -o jsonpath='{.status.desiredNumberScheduled}' 2>/dev/null || echo ?)
+  ready=$(  kubectl -n "$ns" get ds swa-agent -o jsonpath='{.status.numberReady}' 2>/dev/null || echo ?)
+  err "desired=$desired ready=$ready after 60s"
+fi
 
 step 'swa-server authenticated to SaaS control plane'
 # `ServerCaBundleUploaded ... subsystem=controlplane` is emitted ONLY after
 # a successful POST to /api/swa/v1/servergroups/ca-bundles. The post is
 # rejected with 401 if the SM JWT authenticator declines the projected SA
 # token, so this line's presence is proof of successful authn.
-if kubectl -n "$ns" logs deploy/swa-server --tail=400 \
-   | grep -qE 'msg=ServerCaBundleUploaded .*subsystem=controlplane'; then
+if wait_until 60 'kubectl -n '"$ns"' logs deploy/swa-server --tail=400 2>/dev/null | grep -qE "msg=ServerCaBundleUploaded .*subsystem=controlplane"'; then
   ok 'server uploaded CA bundle to control plane'
 else
-  err 'no ServerCaBundleUploaded in last 400 server log lines'
+  err 'no ServerCaBundleUploaded in last 400 server log lines after 60s'
 fi
 
 step 'swa-agent attested and was issued an SVID'
 # Look on the SERVER side, not the agent side — see deviation #2 above.
-if kubectl -n "$ns" logs deploy/swa-server --tail=400 \
-   | grep -qE 'msg=SVIDIssued .*subject=spiffe://[^ ]+/swa-agent/'; then
+if wait_until 60 'kubectl -n '"$ns"' logs deploy/swa-server --tail=400 2>/dev/null | grep -qE "msg=SVIDIssued .*subject=spiffe://[^ ]+/swa-agent/"'; then
   ok 'agent SVID issued by server'
 else
-  err 'no agent SVID issued in last 400 server log lines'
+  err 'no agent SVID issued in last 400 server log lines after 60s'
 fi
 
 step 'workload key type is RSA (not EC) in agent configmap'
