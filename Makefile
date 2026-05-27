@@ -29,7 +29,7 @@ SUMMON = summon -p conceal_summon --yaml "$$SUMMON_YAML"
         up-m1 _check-env
 
 help: ## Show this help
-	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z_-]+:.*##/{printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z0-9_-]+:.*##/{printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 doctor: ## Verify prerequisites
 	@./scripts/doctor.sh
@@ -129,3 +129,22 @@ down: _check-env ## Tear down everything (cluster + tenant TF state). Best-effor
 	-$(SUMMON) -- bash -c 'set -euo pipefail; tok=$$(./scripts/get-sm-token.sh); CONJUR_APPLIANCE_URL=$(PANW_SM_URL) CONJUR_AUTHN_TOKEN=$$tok $(TF) destroy -auto-approve -refresh=false'
 	-kubectl delete ns swa-demo swa-system --wait=false 2>/dev/null
 	-kind delete cluster --name $(KIND_CLUSTER)
+
+.PHONY: tf-apply-app build-apps deploy-apps smoke-m2 up-m2
+
+# --- M2 targets (real bodies added by later M2 tasks) ---
+
+tf-apply-app: _check-env tf-init ## Apply TF subset #2 (authn-jwt, policy, secret) — needs carrier deployed
+	@echo 'tf-apply-app: stub — implemented in M2 Task 13'
+
+build-apps: ## Build the demo app images locally
+	@echo 'build-apps: stub — implemented in M2 Task 8'
+
+deploy-apps: ## Deploy demo app manifests into swa-demo
+	@echo 'deploy-apps: stub — implemented in M2 Task 10/14'
+
+smoke-m2: ## Run M2 acceptance check
+	@./scripts/smoke-m2.sh
+
+up-m2: up-m1 build-apps deploy-apps tf-apply-app smoke-m2 ## Full M2 deploy + smoketest
+	@echo 'M2 ready.'
