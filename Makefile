@@ -25,7 +25,8 @@ SUMMON = summon -p conceal_summon --yaml "$$SUMMON_YAML"
 
 .DEFAULT_GOAL := help
 .PHONY: help doctor tf-token down install-tf-provider cluster images \
-        tf-init tf-apply-platform install-server install-agent _check-env
+        tf-init tf-apply-platform install-server install-agent smoke-m1 \
+        _check-env
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z_-]+:.*##/{printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -95,6 +96,9 @@ install-agent: install-server ## Install/upgrade swa-agent (depends on server be
 	  --namespace swa-system \
 	  -f platform/helm/swa-agent.values.yaml \
 	  --wait --timeout 3m
+
+smoke-m1: _check-env ## M1 acceptance check (spec §14.1). Exit 0 = PASS.
+	@./scripts/smoke-m1.sh
 
 cluster: ## Create the kind cluster ($(KIND_CLUSTER)) if not present
 	@if kind get clusters | grep -qx "$(KIND_CLUSTER)"; then \
