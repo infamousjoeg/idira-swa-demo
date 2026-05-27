@@ -120,6 +120,12 @@ cluster: ## Create the kind cluster ($(KIND_CLUSTER)) if not present
 
 down: _check-env ## Tear down everything (cluster + tenant TF state). Best-effort.
 	-helm -n swa-system uninstall swa-agent swa-server 2>/dev/null
+	@# Destroy TF BEFORE kind delete: data.external.kind_oidc refresh runs
+	@# `kubectl --raw /openid/v1/jwks` against the kind cluster, and TF
+	@# refreshes data sources during destroy. Killing the cluster first
+	@# makes the refresh fail and the destroy stops with state intact.
+	@# `-refresh=false` is a belt-and-suspenders defense in case someone
+	@# nukes the cluster out-of-band before running `make down`.
+	-$(SUMMON) -- bash -c 'set -euo pipefail; tok=$$(./scripts/get-sm-token.sh); CONJUR_APPLIANCE_URL=$(PANW_SM_URL) CONJUR_AUTHN_TOKEN=$$tok $(TF) destroy -auto-approve -refresh=false'
 	-kubectl delete ns swa-demo swa-system --wait=false 2>/dev/null
 	-kind delete cluster --name $(KIND_CLUSTER)
-	-$(SUMMON) -- bash -c 'CONJUR_APPLIANCE_URL=$(PANW_SM_URL) CONJUR_AUTHN_TOKEN=$$(./scripts/get-sm-token.sh) $(TF) destroy -auto-approve' 2>/dev/null || true
