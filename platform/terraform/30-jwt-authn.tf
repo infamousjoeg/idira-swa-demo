@@ -31,4 +31,18 @@ resource "conjur_authenticator" "swa" {
       token_app_property = "sub"
     }
   }
+
+  # PROVIDER QUIRK (v0.8.4): on refresh, the provider reads `issuer` and
+  # `jwks_uri` back as stripped relative paths ("/api/swa/...") instead of
+  # the full URLs that were actually written to the tenant (verified via
+  # direct REST GET on conjur/authn-jwt/.../{issuer,jwks-uri} variables —
+  # the tenant holds the full URLs correctly). This spurious diff forces
+  # destroy+recreate on every apply. ignore_changes prevents the bogus
+  # replacement; the `data` block is still the authoritative source on
+  # initial create. To actually change issuer/jwks_uri/audience after
+  # creation, remove this lifecycle block and `terraform apply` once, then
+  # add it back.
+  lifecycle {
+    ignore_changes = [data]
+  }
 }

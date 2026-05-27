@@ -27,3 +27,15 @@ output "server_id" {
   description = "Computed ID of the SWA server registration."
   value       = swa_server.kind.id
 }
+
+# --- M2 outputs (carrier identity + secret it can read) ---
+
+output "carrier_host_id" {
+  description = "SPIFFE ID of the carrier workload — matches conjur_host.carrier.name and the JWT-SVID sub claim."
+  value       = "spiffe://${var.trust_domain}/${var.node_group}/ns/swa-demo/sa/carrier"
+}
+
+output "carrier_secret_id" {
+  description = "Conjur variable path the carrier reads via the SM REST API (form: 'swa-demo/carrier/api-key', sans 'data/' prefix). trimprefix handles the v0.8.4 provider's '/data/...' normalization."
+  value       = trimprefix("${conjur_secret.carrier_api_key.branch}/${conjur_secret.carrier_api_key.name}", "/data/")
+}

@@ -26,6 +26,12 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.6"
     }
+    # null_resource wraps scripts/sm-load-carrier-host.sh — workaround for the
+    # broken conjur_host.Read in cyberark/conjur v0.8.4 (see 40-policy.tf).
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.2"
+    }
   }
 }
 

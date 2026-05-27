@@ -1,20 +1,32 @@
-# 40-policy.tf — Conjur policy scoping the carrier's SPIFFE ID to one secret.
+# 40-policy.tf — Conjur policy: branches that scope the carrier identity +
+# the carrier api-key variable. The carrier HOST itself is NOT managed here
+# — see the lifecycle comment below.
 #
 # Provider: cyberark/conjur ~> 0.8.4. The provider's model is
 # resource-per-entity (NOT a single YAML policy load), so the M2 plan's
 # `conjur_policy { policy = <<-YAML ... }` shape is translated below into
 # discrete resources. See SCHEMA.md.
 #
-# Topology created here:
+# Topology managed here:
 #
 #   data/swa/trust-domains/idira.demo/workloads         <-- branch (parent of host)
-#     host  spiffe://idira.demo/kind-ng/ns/swa-demo/sa/carrier
-#       authn_descriptor: jwt service_id=secureWorkloadAccess, claim sub=<spiffe-id>
+#                                                           HOST is loaded out-of-band
+#                                                           via scripts/sm-load-carrier-host.sh
+#                                                           (see 50-secret.tf for null_resource trigger)
 #
 #   data/swa-demo                                       <-- branch
 #     data/swa-demo/carrier                             <-- branch
-#       (the actual variable lives here in 50-secret.tf with inline read/execute
-#        permission granted to the carrier host below)
+#                                                           (variable + permission live in 50-secret.tf)
+#
+# WHY NO `conjur_host` RESOURCE: cyberark/conjur v0.8.4 has a broken Read
+# implementation for hosts whose name contains `:` (SPIFFE IDs do). Every
+# `terraform plan` refresh 404s on the carrier host even when it exists in
+# SM, drops it from state, and the subsequent apply 409s on recreate.
+# `terraform import conjur_host.X ...` also rejects: "Resource Import Not
+# Implemented." Empirically verified 2026-05-27. Workaround: load the
+# carrier host via PATCH policy YAML from a script invoked by a
+# null_resource in 50-secret.tf. The resulting host is then referenced by
+# the conjur_permission grant via literal-string lookup (kind/branch/name).
 #
 # PROVIDER QUIRK (v0.8.4): conjur_policy_branch.ValidateConfig rejects
 # `branch` values that are not pure string literals at validate time, even when
@@ -46,39 +58,20 @@ resource "conjur_policy_branch" "swa_demo_carrier" {
   depends_on = [conjur_policy_branch.swa_demo]
 }
 
-# ---- Carrier host: declares the carrier's SPIFFE ID as a Conjur host and
-# binds it to the secureWorkloadAccess JWT authenticator ----
+# ---- Carrier host: NOT managed by Terraform ----
 #
-# When a JWT-SVID arrives with sub=<carrier_spiffe_id>, the authenticator
-# (see 30-jwt-authn.tf) looks up the host at <identity_path>/<sub>. The
-# authn_descriptor's `claims` map adds an additional constraint: the JWT
-# MUST present these exact claim values to authenticate as this host —
-# defense-in-depth against an attacker who somehow registers a host with
-# the same name but a different SPIFFE ID.
-resource "conjur_host" "carrier" {
-  # Literal — same provider quirk applies to conjur_host.branch.
-  branch = "data/swa/trust-domains/idira.demo/workloads"
-  name   = "spiffe://idira.demo/kind-ng/ns/swa-demo/sa/carrier"
-
-  annotations = {
-    description = "Idira SWA demo — carrier service (M2)"
-    spiffe_id   = "spiffe://idira.demo/kind-ng/ns/swa-demo/sa/carrier"
-  }
-
-  authn_descriptors = [
-    {
-      type       = "jwt"
-      service_id = "secureWorkloadAccess"
-      data = {
-        claims = {
-          sub = "spiffe://idira.demo/kind-ng/ns/swa-demo/sa/carrier"
-        }
-      }
-    },
-  ]
-
-  depends_on = [
-    conjur_authenticator.swa,
-    conjur_policy_branch.workloads,
-  ]
-}
+# The carrier host (name = "spiffe://idira.demo/kind-ng/ns/swa-demo/sa/carrier",
+# parent branch = "data/swa/trust-domains/idira.demo/workloads") is loaded
+# into SM by scripts/sm-load-carrier-host.sh, invoked from a null_resource
+# in 50-secret.tf. See the WHY NO `conjur_host` RESOURCE callout in the
+# file header for the root cause and reproduction.
+#
+# Trust chain (unchanged by the script-vs-TF split):
+#   JWT-SVID → authenticator (iss/aud/sig + JWKS) → host lookup by sub
+#     → conjur_permission.carrier_read_api_key (in 50-secret.tf) grants
+#       host read+execute on the api-key variable.
+#
+# The host's YAML body (in the script) binds it to authenticate ONLY via
+# the `secureWorkloadAccess` JWT authenticator (`restrictions: [!jwt
+# authenticator: secureWorkloadAccess]`) — equivalent in effect to the
+# `authn_descriptors[].type=jwt` we would have set on conjur_host.

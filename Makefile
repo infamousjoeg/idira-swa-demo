@@ -134,8 +134,13 @@ down: _check-env ## Tear down everything (cluster + tenant TF state). Best-effor
 
 # --- M2 targets (real bodies added by later M2 tasks) ---
 
-tf-apply-app: _check-env tf-init ## Apply TF subset #2 (authn-jwt, policy, secret) — needs carrier deployed
-	@echo 'tf-apply-app: stub — implemented in M2 Task 13'
+tf-apply-app: _check-env tf-init ## Apply TF subset #2: jwt authn + policy + secret (no -target — full apply)
+	@$(SUMMON) -- bash -c '\
+	  set -euo pipefail; \
+	  tok=$$(./scripts/get-sm-token.sh); \
+	  CONJUR_APPLIANCE_URL=$(PANW_SM_URL) CONJUR_AUTHN_TOKEN=$$tok \
+	    $(TF) apply -auto-approve -var sm_url=$(PANW_SM_URL)'
+	@$(TF) output -json | jq -r '"carrier_host_id   = " + .carrier_host_id.value, "carrier_secret_id = " + .carrier_secret_id.value'
 
 build-apps: ## Build the demo app images locally and load into kind
 	docker build -t idira/carrier:m2 apps/carrier/
