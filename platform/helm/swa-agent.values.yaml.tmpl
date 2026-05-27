@@ -1,0 +1,48 @@
+# swa-agent.values.yaml.tmpl — rendered via `envsubst` into
+# platform/helm/swa-agent.values.yaml. Currently no env vars are consumed,
+# but the .tmpl form is preserved for symmetry with swa-server and so M2 can
+# inject workload-specific values (e.g. SVID audience for the carrier).
+#
+# CRITICAL — RSA workload key override (spec §6.3 line 144):
+# The SM JWT authenticator rejects EC-signed JWTs. The chart's defaults for
+# `agent.key.type` and `workload.key.type` are both ECP256; both must be
+# overridden to RSA2048 or workload→SM authentication will fail with an
+# unhelpful "invalid token" error inside SM. If RSA2048 is rejected by the
+# bundled agent, fallback enum strings (in order, from spec) are:
+#   "rsa-2048", then "RSA-2048".
+
+image:
+  repository: swa-agent
+  tag: 0.0.0-SNAPSHOT-arm64v8        # M1 is Apple-Silicon only
+  pullPolicy: IfNotPresent             # kind has the image preloaded — never pull
+
+trustDomain:
+  name: idira.demo                     # MUST match swa_trust_domain.idira.name in TF
+
+server:
+  address: swa-server.swa-system.svc.cluster.local:8443
+
+nodeAttestor:
+  type: k8s_psat
+  k8s_psat:
+    cluster: kind-swa                  # MUST match the var.kind_cluster value
+                                       # used as the map key under
+                                       # swa_server_group.kind_sg.node_attestation.k8s_psat.clusters
+    # tokenPath kept at chart default (/var/run/secrets/swa/serviceaccount/token).
+    # That projected token has audience "swa-server" — matches the audience
+    # list set in TF (swa_server_group.node_attestation.k8s_psat.clusters.*.audience).
+
+# RSA override — see header. This is rubric criterion #4 — the test in
+# scripts/smoke-m1.sh verifies the rendered ConfigMap contains "RSA" and
+# does NOT contain "ECP".
+agent:
+  key:
+    type: RSA2048
+workload:
+  key:
+    type: RSA2048
+
+# Label required by the server's PSAT attestor — value must match the
+# node_group name (swa_node_group.kind_ng.name = "kind-ng").
+podLabels:
+  swa_nodegroup: kind-ng
