@@ -1,0 +1,23 @@
+{
+  "SHP-2049-883": {
+    "shipment_id": "SHP-2049-883",
+    "origin": "Singapore",
+    "destination": "Long Beach",
+    "eta": "2026-06-09T14:00:00Z",
+    "carrier_name": "Praetor Logistics"
+  },
+  "SHP-2049-884": {
+    "shipment_id": "SHP-2049-884",
+    "origin": "Rotterdam",
+    "destination": "Newark",
+    "eta": "2026-06-12T09:30:00Z",
+    "carrier_name": "Praetor Logistics"
+  },
+  "SHP-2049-885": {
+    "shipment_id": "SHP-2049-885",
+    "origin": "Shenzhen",
+    "destination": "Oakland",
+    "eta": "2026-06-15T22:15:00Z",
+    "carrier_name": "Praetor Logistics"
+  }
+}
