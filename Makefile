@@ -24,7 +24,7 @@ export SUMMON_YAML
 SUMMON = summon -p conceal_summon --yaml "$$SUMMON_YAML"
 
 .DEFAULT_GOAL := help
-.PHONY: help doctor tf-token down _check-env
+.PHONY: help doctor tf-token down install-tf-provider _check-env
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z_-]+:.*##/{printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -38,6 +38,13 @@ _check-env:
 tf-token: _check-env ## Print env exports to source for manual `terraform` use
 	@echo "export CONJUR_APPLIANCE_URL=$(PANW_SM_URL)"
 	@printf 'export CONJUR_AUTHN_TOKEN=%s\n' "$$($(SUMMON) -- ./scripts/get-sm-token.sh)"
+
+install-tf-provider: ## Install cyberark/swa terraform provider from the bundle
+	cd swa-release-1.0.4 && ./install-terraform-provider.sh
+	@# Defang macOS Gatekeeper quarantine if present (see DEPLOY_MACOS.md).
+	-xattr -d com.apple.quarantine \
+	  ~/.terraform.d/plugins/registry.terraform.io/cyberark/swa/*/darwin_arm64/terraform-provider-swa_* \
+	  2>/dev/null || true
 
 down: _check-env ## Tear down everything (cluster + tenant TF state). Best-effort.
 	-helm -n swa-system uninstall swa-agent swa-server 2>/dev/null
