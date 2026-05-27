@@ -1,0 +1,32 @@
+# swa-server.values.yaml.tmpl — rendered via `envsubst` into
+# platform/helm/swa-server.values.yaml. The rendered file is gitignored.
+#
+# Env vars consumed (set by the Makefile's install-server target):
+#   PANW_SM_URL    — https://<tenant>.secretsmgr.cyberark.cloud
+#   SWA_LOGIN_URL  — tf output `login_url` (was named `authn_id` in the
+#                    plan; bundled provider's actual computed attribute is
+#                    `login_url` per SCHEMA.md)
+#
+# Critical: the bundled chart has NO `trustDomain.name` key on the SERVER
+# side. The trust-domain identity lives on the control plane (TF) and on
+# the agent (see swa-agent.values.yaml.tmpl). Spec §8.2 lines 233-236
+# documents this; upstream public Helm docs are misleading for the
+# bundled chart.
+
+image:
+  repository: swa-server
+  tag: 0.0.0-SNAPSHOT-arm64v8     # M1 is Apple-Silicon only (spec §1, doctor.sh)
+  pullPolicy: IfNotPresent         # kind has the image preloaded — never pull
+
+controlPlane:
+  url: ${PANW_SM_URL}              # e.g. https://infamous.secretsmgr.cyberark.cloud
+  auth:
+    type: jwt                      # chart default; pinned to match SM JWT authn
+    loginURL: ${SWA_LOGIN_URL}     # full Conjur authenticate URL (base64-encoded)
+    audience: conjur               # MUST match swa_server.auth.audience in TF
+                                   # AND the audience asserted by the projected
+                                   # SA token (chart sets this on the volume).
+
+rbac:
+  createTokenReviewRole: true      # required by k8s_psat node attestor; only
+                                   # broad cluster RBAC granted in M1
