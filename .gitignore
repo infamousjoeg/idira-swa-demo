@@ -9,6 +9,10 @@ platform/terraform/.terraform/
 platform/terraform/.terraform.lock.hcl
 platform/terraform/terraform.tfstate
 platform/terraform/terraform.tfstate.backup
+platform/terraform/terraform.tfstate.*.backup
 platform/terraform/.terraform.tfstate.lock.info
 platform/terraform/SCHEMA.md
 platform/helm/*.values.yaml
+
+# M2 additions
+apps/carrier/carrier

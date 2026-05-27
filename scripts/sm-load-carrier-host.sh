@@ -51,49 +51,104 @@ branch_encoded=$(python3 -c \
 
 spiffe_id="spiffe://idira.demo/kind-ng/ns/swa-demo/sa/carrier"
 
-# Build the policy YAML. NOTE: standard Conjur policy YAML's `!jwt`
-# restriction tag is rejected by SM SaaS's policy validator (HTTP 422
-# "Unrecognized data type '!jwt'" — verified 2026-05-27). The annotation
-# key `authn-jwt/secureWorkloadAccess/...` is server-reserved and also
-# rejected. Resolution: load a bare !host. The authenticator's
-# identity_path scoping (in 30-jwt-authn.tf) plus SM's auto-membership
-# of every host under that branch into the
-# `conjur/authn-jwt/secureWorkloadAccess/apps` consumer group provides
-# the binding — only this host with this SPIFFE ID, authenticating via
-# this authenticator, can read variables granted to it.
+# SM SaaS quirks affecting this script:
+#   - Standard Conjur `restrictions: [!jwt authenticator: X]` is rejected
+#     with HTTP 422 "Unrecognized data type '!jwt'". The supported mechanism
+#     for binding a JWT `sub` claim to a host is the
+#     `authn-jwt/<service-id>/sub` annotation, NOT a restriction block.
+#     See swa-docs/pages/cjr-authn-jwt-swa.md lines 137-153.
+#   - Without the `authn-jwt/secureWorkloadAccess/sub` annotation, SM cannot
+#     map the JWT-SVID's `sub` claim back to the host record and the
+#     authenticate endpoint returns 401 with an empty body — diagnostically
+#     useless. Verified 2026-05-27 by exhaustively confirming iss/aud/sub
+#     are correct, signature/JWKS kid match, host is in apps group, and the
+#     401 still occurred until the annotation was added.
+#   - SM does NOT auto-add hosts under the authenticator's identity_path
+#     to the `conjur/authn-jwt/secureWorkloadAccess/apps` consumer group
+#     (verified 2026-05-27 via GET /resources/.../group/.../apps — the
+#     group's `members` field stays empty until explicitly granted).
+#     Without that membership SM returns 403 from the authenticate endpoint
+#     even though the JWT-SVID is signature-valid and iss/aud/sub-correct.
+#
+# Resolution: TWO PATCHes on `up` (and the inverse on `down`):
+#   1) Load a `!host` (with the authn-jwt sub annotation) into the
+#      workloads branch.
+#   2) Load a `!grant` into the authenticator's own policy branch binding
+#      the carrier host into the apps consumer group.
+# Both are idempotent: re-applying yields 201 with no-op result, and
+# `!delete` of an absent record is also 201 with empty `deleted_roles`.
+
+authn_branch="conjur/authn-jwt/secureWorkloadAccess"
+authn_branch_encoded=$(python3 -c \
+  "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" \
+  "$authn_branch")
+
+# Fully-qualified host id, as it appears in SM (relative to the workloads
+# branch). Used for the grant's !host reference from a different policy
+# branch.
+host_fqid="${branch_path}/${spiffe_id}"
+
 if [ "$action" = "up" ]; then
-  yaml=$(cat <<YAML
+  host_yaml=$(cat <<YAML
 - !host
   id: ${spiffe_id}
   annotations:
     description: Idira SWA demo — carrier service (M2)
     spiffe_id: ${spiffe_id}
+    authn-jwt/secureWorkloadAccess/sub: ${spiffe_id}
+YAML
+  )
+  grant_yaml=$(cat <<YAML
+- !grant
+  role: !group apps
+  member: !host /${host_fqid}
 YAML
   )
 else
-  yaml=$(cat <<YAML
+  # On down: drop the grant first (so the policy is clean even if the host
+  # delete is skipped for any reason), then drop the host. Order does not
+  # affect correctness of the next 'up'.
+  host_yaml=$(cat <<YAML
 - !delete
   record: !host ${spiffe_id}
 YAML
   )
+  grant_yaml=$(cat <<YAML
+- !revoke
+  role: !group apps
+  member: !host /${host_fqid}
+YAML
+  )
 fi
 
-url="${CONJUR_APPLIANCE_URL}/api/policies/conjur/policy/${branch_encoded}"
+patch_policy() {
+  local label="$1" url="$2" body="$3"
+  local out="/tmp/sm-load-carrier-host.${label}.out"
+  local code
+  code=$(curl -sL -o "$out" -w '%{http_code}' \
+    -X PATCH \
+    -H "Authorization: Token token=\"${tok}\"" \
+    -H 'Content-Type: application/x-yaml' \
+    --data-binary "$body" \
+    "$url")
+  if [ "$code" != "201" ] && [ "$code" != "200" ]; then
+    echo "sm-load-carrier-host.sh $action [$label]: HTTP $code" >&2
+    cat "$out" >&2
+    return 1
+  fi
+  echo "sm-load-carrier-host.sh $action [$label]: HTTP $code (ok)"
+}
 
-# PATCH is idempotent: re-loading the same host is a no-op; deleting an
-# already-deleted host returns 201 with empty `created_roles`. Either way,
-# exit non-zero only on transport error (curl -f drops body on >=400).
-http=$(curl -sL -o /tmp/sm-load-carrier-host.out -w '%{http_code}' \
-  -X PATCH \
-  -H "Authorization: Token token=\"${tok}\"" \
-  -H 'Content-Type: application/x-yaml' \
-  --data-binary "$yaml" \
-  "$url")
+host_url="${CONJUR_APPLIANCE_URL}/api/policies/conjur/policy/${branch_encoded}"
+grant_url="${CONJUR_APPLIANCE_URL}/api/policies/conjur/policy/${authn_branch_encoded}"
 
-if [ "$http" != "201" ] && [ "$http" != "200" ]; then
-  echo "sm-load-carrier-host.sh $action: HTTP $http" >&2
-  cat /tmp/sm-load-carrier-host.out >&2
-  exit 1
+# Order on 'up': host then grant (the grant references the host).
+# Order on 'down': grant then host (revoke before the role disappears, even
+# though Conjur tolerates revoking via a deleted member).
+if [ "$action" = "up" ]; then
+  patch_policy host  "$host_url"  "$host_yaml"
+  patch_policy grant "$grant_url" "$grant_yaml"
+else
+  patch_policy grant "$grant_url" "$grant_yaml"
+  patch_policy host  "$host_url"  "$host_yaml"
 fi
-
-echo "sm-load-carrier-host.sh $action: HTTP $http (ok)"

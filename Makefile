@@ -152,13 +152,30 @@ build-apps: ## Build the demo app images locally and load into kind
 
 deploy-apps: ## Deploy the demo app manifests into swa-demo
 	kubectl apply -f platform/k8s/namespace.yaml
+	@# carrier-config holds the SM URL + variable path the carrier reads.
+	@# variable path is the Conjur resource id verbatim — `data/<branch>/<name>`
+	@# (verified empirically 2026-05-27: omitting the `data/` prefix returns
+	@# CONJ00076E "variable not found" because Conjur looks up the literal
+	@# resource id and there is no record at the bare path).
+	@# Stays in lockstep with conjur_secret.carrier_api_key in TF: branch
+	@# `/data/swa-demo/carrier` + name `api-key` → resource id
+	@# `data/swa-demo/carrier/api-key`.
 	@kubectl -n swa-demo create configmap carrier-config \
 	  --from-literal=sm_url=$(PANW_SM_URL) \
-	  --from-literal=secret_id=swa-demo/carrier/api-key \
+	  --from-literal=secret_id=data/swa-demo/carrier/api-key \
 	  --dry-run=client -o yaml | kubectl apply -f -
 	kubectl apply -f platform/k8s/carrier.deployment.yaml
 	kubectl apply -f platform/k8s/carrier.service.yaml
+	@# Preload curlimages/curl into kind. Same HTTP_PROXY pull failure that
+	@# bit busybox in `make images` (M1) hits the curl image too — the kind
+	@# kubelet inherits Docker Desktop's proxy at 127.0.0.1:8080 which is
+	@# unreachable from inside the node. Pulling locally + `kind load`
+	@# bypasses the kubelet pull entirely.
+	@docker image inspect curlimages/curl:8.10.1 >/dev/null 2>&1 || docker pull curlimages/curl:8.10.1
+	kind load docker-image curlimages/curl:8.10.1 --name $(KIND_CLUSTER)
+	kubectl apply -f platform/k8s/portal-stub.yaml
 	kubectl -n swa-demo rollout status deploy/carrier --timeout=2m
+	kubectl -n swa-demo wait --for=condition=Ready pod/portal-stub --timeout=60s
 
 smoke-m2: ## Run M2 acceptance check
 	@./scripts/smoke-m2.sh
