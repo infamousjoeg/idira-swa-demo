@@ -45,3 +45,8 @@ variable "swa_agent_sa" {
   type        = string
   default     = "swa-agent"
 }
+
+variable "sm_url" {
+  description = "Secrets Manager – SaaS base URL (no trailing slash). Used to compute the JWT authenticator's issuer and jwks_uri. Passed via -var from the Makefile."
+  type        = string
+}
