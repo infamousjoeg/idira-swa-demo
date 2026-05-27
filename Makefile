@@ -130,7 +130,7 @@ down: _check-env ## Tear down everything (cluster + tenant TF state). Best-effor
 	@# makes the refresh fail and the destroy stops with state intact.
 	@# `-refresh=false` is a belt-and-suspenders defense in case someone
 	@# nukes the cluster out-of-band before running `make down`.
-	-$(SUMMON) -- bash -c 'set -euo pipefail; tok=$$(./scripts/get-sm-token.sh); CONJUR_APPLIANCE_URL=$(PANW_SM_URL) CONJUR_AUTHN_TOKEN=$$tok $(TF) destroy -auto-approve -refresh=false'
+	-$(SUMMON) -- bash -c 'set -euo pipefail; tok=$$(./scripts/get-sm-token.sh); CONJUR_APPLIANCE_URL=$(PANW_SM_URL) CONJUR_AUTHN_TOKEN=$$tok $(TF) destroy -auto-approve -refresh=false -var sm_url=$(PANW_SM_URL)'
 	-kubectl delete ns swa-demo swa-system --wait=false 2>/dev/null
 	-kind delete cluster --name $(KIND_CLUSTER)
 

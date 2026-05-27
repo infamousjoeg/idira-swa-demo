@@ -9,14 +9,18 @@
 #
 # Topology managed here:
 #
-#   data/swa/trust-domains/idira.demo/workloads         <-- branch (parent of host)
-#                                                           HOST is loaded out-of-band
-#                                                           via scripts/sm-load-carrier-host.sh
-#                                                           (see 50-secret.tf for null_resource trigger)
-#
 #   data/swa-demo                                       <-- branch
 #     data/swa-demo/carrier                             <-- branch
 #                                                           (variable + permission live in 50-secret.tf)
+#
+# The carrier identity branch (`data/swa/trust-domains/idira.demo/workloads`)
+# is NOT managed here — `swa_trust_domain.idira` (in 10-spiffe.tf) auto-
+# creates the full SWA tree (trust-domains, <td>, <td>/workloads) as a
+# side-effect of trust-domain registration. Trying to also manage the
+# `workloads` branch via `conjur_policy_branch` returns 409 Conflict on
+# create. Verified empirically 2026-05-27 by comparing created_at
+# timestamps: the trust domain and the workloads branch share the same
+# millisecond.
 #
 # WHY NO `conjur_host` RESOURCE: cyberark/conjur v0.8.4 has a broken Read
 # implementation for hosts whose name contains `:` (SPIFFE IDs do). Every
@@ -36,12 +40,6 @@
 # LITERAL string — no `var.X`, no resource references. Trust domain `idira.demo`
 # matches `var.trust_domain` default; if the default ever changes, these
 # literals must change in lockstep (callout in spec).
-
-# ---- Workloads policy branch (identity_path target of the authenticator) ----
-resource "conjur_policy_branch" "workloads" {
-  branch = "data/swa/trust-domains/idira.demo"
-  name   = "workloads"
-}
 
 # ---- Variable-scope branches (carrier secret lives at swa-demo/carrier) ----
 resource "conjur_policy_branch" "swa_demo" {

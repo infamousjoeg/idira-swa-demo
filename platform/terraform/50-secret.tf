@@ -70,9 +70,12 @@ resource "conjur_secret" "carrier_api_key" {
 # resource re-runs if the SPIFFE ID or the authenticator changes.
 resource "null_resource" "carrier_host" {
   triggers = {
-    spiffe_id        = "spiffe://idira.demo/kind-ng/ns/swa-demo/sa/carrier"
-    authenticator    = conjur_authenticator.swa.name
-    workloads_branch = conjur_policy_branch.workloads.full_id
+    spiffe_id     = "spiffe://idira.demo/kind-ng/ns/swa-demo/sa/carrier"
+    authenticator = conjur_authenticator.swa.name
+    # Re-run on trust-domain change — the workloads branch (parent of the
+    # host) lives under the trust domain and is auto-created by the SWA
+    # provider when the trust domain registers (see 40-policy.tf header).
+    trust_domain = swa_trust_domain.idira.name
   }
 
   # Create / refresh the host. Env (CONJUR_APPLIANCE_URL + CONJUR_AUTHN_TOKEN)
@@ -93,7 +96,7 @@ resource "null_resource" "carrier_host" {
 
   depends_on = [
     conjur_authenticator.swa,
-    conjur_policy_branch.workloads,
+    swa_trust_domain.idira, # workloads branch auto-created here
   ]
 }
 
