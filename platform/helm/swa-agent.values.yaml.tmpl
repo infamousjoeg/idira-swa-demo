@@ -19,6 +19,15 @@ image:
 trustDomain:
   name: idira.demo                     # MUST match swa_trust_domain.idira.name in TF
 
+# Trust-on-first-use of the server's self-signed bootstrap bundle.
+# swa-server in M1 generates its own CA (logs: "generating self-signed root
+# CA") because we don't supply controlPlane.bootstrap.bundleSourceUrl. The
+# agent must therefore accept that bundle on first connect. For a laptop
+# demo this is fine; production deploys would set bundleSourceUrl to an
+# https endpoint serving the trust bundle.
+bootstrap:
+  insecure: true
+
 server:
   address: swa-server.swa-system.svc.cluster.local:8443
 
