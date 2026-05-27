@@ -25,7 +25,7 @@ SUMMON = summon -p conceal_summon --yaml "$$SUMMON_YAML"
 
 .DEFAULT_GOAL := help
 .PHONY: help doctor tf-token down install-tf-provider cluster images \
-        tf-init tf-apply-platform install-server _check-env
+        tf-init tf-apply-platform install-server install-agent _check-env
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z_-]+:.*##/{printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -86,6 +86,14 @@ install-server: tf-apply-platform ## Render values and install/upgrade swa-serve
 	helm upgrade --install swa-server swa-release-1.0.4/helm/swa-server-0.1.0.tgz \
 	  --namespace swa-system --create-namespace \
 	  -f platform/helm/swa-server.values.yaml \
+	  --wait --timeout 3m
+
+install-agent: install-server ## Install/upgrade swa-agent (depends on server being up)
+	@envsubst < platform/helm/swa-agent.values.yaml.tmpl \
+	  > platform/helm/swa-agent.values.yaml
+	helm upgrade --install swa-agent swa-release-1.0.4/helm/swa-agent-0.1.0.tgz \
+	  --namespace swa-system \
+	  -f platform/helm/swa-agent.values.yaml \
 	  --wait --timeout 3m
 
 cluster: ## Create the kind cluster ($(KIND_CLUSTER)) if not present
