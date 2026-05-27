@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: swa-demo
+  labels:
+    app.kubernetes.io/part-of: idira-swa-demo
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: carrier
+  namespace: swa-demo
