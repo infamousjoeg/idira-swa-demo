@@ -24,7 +24,7 @@ export SUMMON_YAML
 SUMMON = summon -p conceal_summon --yaml "$$SUMMON_YAML"
 
 .DEFAULT_GOAL := help
-.PHONY: help doctor tf-token down install-tf-provider cluster _check-env
+.PHONY: help doctor tf-token down install-tf-provider cluster images _check-env
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z_-]+:.*##/{printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -45,6 +45,9 @@ install-tf-provider: ## Install cyberark/swa terraform provider from the bundle
 	-xattr -d com.apple.quarantine \
 	  ~/.terraform.d/plugins/registry.terraform.io/cyberark/swa/*/darwin_arm64/terraform-provider-swa_* \
 	  2>/dev/null || true
+
+images: ## Load bundled SWA images into the kind cluster (delegates to bundle Makefile)
+	$(MAKE) -C swa-release-1.0.4 kind-load-images KIND_CLUSTER=$(KIND_CLUSTER)
 
 cluster: ## Create the kind cluster ($(KIND_CLUSTER)) if not present
 	@if kind get clusters | grep -qx "$(KIND_CLUSTER)"; then \
