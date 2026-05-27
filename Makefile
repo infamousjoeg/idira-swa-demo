@@ -137,8 +137,9 @@ down: _check-env ## Tear down everything (cluster + tenant TF state). Best-effor
 tf-apply-app: _check-env tf-init ## Apply TF subset #2 (authn-jwt, policy, secret) — needs carrier deployed
 	@echo 'tf-apply-app: stub — implemented in M2 Task 13'
 
-build-apps: ## Build the demo app images locally
-	@echo 'build-apps: stub — implemented in M2 Task 8'
+build-apps: ## Build the demo app images locally and load into kind
+	docker build -t idira/carrier:m2 apps/carrier/
+	kind load docker-image idira/carrier:m2 --name $(KIND_CLUSTER)
 
 deploy-apps: ## Deploy demo app manifests into swa-demo
 	@echo 'deploy-apps: stub — implemented in M2 Task 10/14'
