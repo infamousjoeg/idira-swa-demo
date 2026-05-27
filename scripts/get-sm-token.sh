@@ -26,10 +26,16 @@ identity_jwt=$(curl -fsSL --max-time 10 -X POST \
   --data-urlencode "scope=api" \
   | jq -er .access_token)
 
-# Step 3 — Exchange at SM for the operator token (already base64-encoded
-# thanks to Accept-Encoding header — TF provider consumes it verbatim).
+# Step 3 — Exchange at SM for the operator token.
+# IMPORTANT: do NOT request `Accept-Encoding: base64` here. The cyberark/swa
+# Terraform provider (which embeds conjur-api-go) reads CONJUR_AUTHN_TOKEN as
+# the raw Conjur JSON access token, not as a base64-encoded blob. Asking SM
+# to base64 the response yields a string starting with `eyJ...` which the
+# provider then tries to json.Unmarshal directly, producing
+# "Unable to unmarshal token: invalid character 'e' looking for beginning of
+# value". Plain SM response is the JSON `{"protected":"...","payload":"...",
+# "signature":"..."}` which is exactly what conjur-api-go expects.
 curl -fsSL --max-time 10 -X POST \
   "https://${PANW_SM_TENANT}.secretsmgr.cyberark.cloud/api/authn-oidc/cyberark/conjur/authenticate" \
-  -H 'Accept-Encoding: base64' \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   --data-urlencode "id_token=${identity_jwt}"
