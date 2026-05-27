@@ -25,7 +25,7 @@ SUMMON = summon -p conceal_summon --yaml "$$SUMMON_YAML"
 
 .DEFAULT_GOAL := help
 .PHONY: help doctor tf-token down install-tf-provider cluster images \
-        tf-init tf-apply-platform _check-env
+        tf-init tf-apply-platform install-server _check-env
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z_-]+:.*##/{printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -47,8 +47,15 @@ install-tf-provider: ## Install cyberark/swa terraform provider from the bundle
 	  ~/.terraform.d/plugins/registry.terraform.io/cyberark/swa/*/darwin_arm64/terraform-provider-swa_* \
 	  2>/dev/null || true
 
-images: ## Load bundled SWA images into the kind cluster (delegates to bundle Makefile)
+images: ## Load bundled SWA images + busybox (init containers) into kind
 	$(MAKE) -C swa-release-1.0.4 kind-load-images KIND_CLUSTER=$(KIND_CLUSTER)
+	@# Both chart's init containers use busybox:latest with imagePullPolicy:
+	@# IfNotPresent. On a laptop where the kubelet inherits HTTP_PROXY from
+	@# the host (Docker Desktop common case), the proxy at 127.0.0.1:8080 is
+	@# unreachable from inside the kind node, so the pull silently fails.
+	@# Preloading busybox into kind avoids the pull entirely.
+	@docker image inspect busybox:latest >/dev/null 2>&1 || docker pull busybox:latest
+	kind load docker-image busybox:latest --name $(KIND_CLUSTER)
 
 tf-init: install-tf-provider ## terraform init (after provider is installed)
 	$(TF) init -upgrade
@@ -70,6 +77,16 @@ tf-apply-platform: _check-env tf-init ## Apply TF subset #1: SPIFFE hierarchy + 
 	      -target=swa_node_group.kind_ng \
 	      -target=swa_server.kind'
 	@$(TF) output -json | jq -r '"login_url = " + .login_url.value'
+
+install-server: tf-apply-platform ## Render values and install/upgrade swa-server (waits for ready)
+	@PANW_SM_URL=$(PANW_SM_URL) \
+	  SWA_LOGIN_URL=$$($(TF) output -raw login_url) \
+	  envsubst < platform/helm/swa-server.values.yaml.tmpl \
+	  > platform/helm/swa-server.values.yaml
+	helm upgrade --install swa-server swa-release-1.0.4/helm/swa-server-0.1.0.tgz \
+	  --namespace swa-system --create-namespace \
+	  -f platform/helm/swa-server.values.yaml \
+	  --wait --timeout 3m
 
 cluster: ## Create the kind cluster ($(KIND_CLUSTER)) if not present
 	@if kind get clusters | grep -qx "$(KIND_CLUSTER)"; then \
