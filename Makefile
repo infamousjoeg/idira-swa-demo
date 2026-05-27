@@ -26,7 +26,7 @@ SUMMON = summon -p conceal_summon --yaml "$$SUMMON_YAML"
 .DEFAULT_GOAL := help
 .PHONY: help doctor tf-token down install-tf-provider cluster images \
         tf-init tf-apply-platform install-server install-agent smoke-m1 \
-        _check-env
+        up-m1 _check-env
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z_-]+:.*##/{printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -99,6 +99,15 @@ install-agent: install-server ## Install/upgrade swa-agent (depends on server be
 
 smoke-m1: _check-env ## M1 acceptance check (spec §14.1). Exit 0 = PASS.
 	@./scripts/smoke-m1.sh
+
+# up-m1 — full M1 from a clean slate. The dependency chain runs each step
+# in order (doctor → cluster → images → tf → helm → smoke). `make up` for
+# the whole demo is added in M3 (chains M1+M2+M3 targets); M1 exposes its
+# own composite so the validator can run a single command.
+up-m1: doctor cluster images tf-apply-platform install-server install-agent smoke-m1 ## Full M1 deploy + smoketest from clean slate
+	@echo
+	@echo 'M1 ready. Server + agent healthy, SPIFFE hierarchy registered on tenant.'
+	@echo 'Next: M2 plan (carrier service + secret).'
 
 cluster: ## Create the kind cluster ($(KIND_CLUSTER)) if not present
 	@if kind get clusters | grep -qx "$(KIND_CLUSTER)"; then \
