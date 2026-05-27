@@ -41,11 +41,17 @@ resource "swa_server_group" "kind_sg" {
           # projected-volume audience configuration.
           audience = ["swa-server"]
 
-          # Lock attestation down to the swa-agent SA only. Schema docstring
-          # says "namespace/name format" (slash, not colon — the plan draft
-          # had this wrong).
+          # Lock attestation down to the swa-agent SA only.
+          # NOTE: the provider schema docstring says "namespace/name format"
+          # (slash), but the swa-server in v1.0.4 actually enforces
+          # "namespace:name" (colon). Verified empirically: with slash the
+          # agent log shows
+          #   PermissionDenied: "swa-system:swa-agent" is not an allowed
+          #   service account
+          # — i.e. the server prints the SA in colon form and matches the
+          # allow-list literally.
           service_account_allow_list = [
-            "${var.swa_namespace}/${var.swa_agent_sa}",
+            "${var.swa_namespace}:${var.swa_agent_sa}",
           ]
         }
       }
