@@ -24,7 +24,7 @@ export SUMMON_YAML
 SUMMON = summon -p conceal_summon --yaml "$$SUMMON_YAML"
 
 .DEFAULT_GOAL := help
-.PHONY: help doctor tf-token down install-tf-provider _check-env
+.PHONY: help doctor tf-token down install-tf-provider cluster _check-env
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z_-]+:.*##/{printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -45,6 +45,15 @@ install-tf-provider: ## Install cyberark/swa terraform provider from the bundle
 	-xattr -d com.apple.quarantine \
 	  ~/.terraform.d/plugins/registry.terraform.io/cyberark/swa/*/darwin_arm64/terraform-provider-swa_* \
 	  2>/dev/null || true
+
+cluster: ## Create the kind cluster ($(KIND_CLUSTER)) if not present
+	@if kind get clusters | grep -qx "$(KIND_CLUSTER)"; then \
+	  echo "kind cluster '$(KIND_CLUSTER)' already exists — skipping create"; \
+	else \
+	  kind create cluster --name $(KIND_CLUSTER) --image kindest/node:v1.34.0; \
+	fi
+	@kubectl cluster-info --context kind-$(KIND_CLUSTER) >/dev/null
+	@echo "kind cluster '$(KIND_CLUSTER)' ready (context: kind-$(KIND_CLUSTER))"
 
 down: _check-env ## Tear down everything (cluster + tenant TF state). Best-effort.
 	-helm -n swa-system uninstall swa-agent swa-server 2>/dev/null
