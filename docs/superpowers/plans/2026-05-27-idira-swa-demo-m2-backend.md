@@ -1307,38 +1307,135 @@ git commit -m "feat(m2): carrier deployment + service + deploy-apps make target"
 
 ---
 
-## Task 11: `30-jwt-authn.tf` — SM JWT authenticator (spec §6.3, §7.1)
+## Task 11: `30-jwt-authn.tf` — Conjur JWT authenticator (spec §6.3, §7.1; AMENDED 2026-05-27)
 
 **Files:**
 - Create: `platform/terraform/30-jwt-authn.tf`
+- Modify: `platform/terraform/main.tf` (add `cyberark/conjur` to `required_providers`)
 
-The spec §6.3 table lists five Conjur-style variables the JWT authenticator needs. If `SCHEMA.md` (M1 Task 6) shows an aggregate resource like `swa_jwt_authenticator`, use that. If only `swa_variable` exists, set the five via five resources under `conjur/authn-jwt/secureWorkloadAccess/`. This plan writes the aggregate path first with a fallback note.
+**Architectural correction (2026-05-27):** the bundled `cyberark/swa` provider does NOT ship a JWT-authenticator, policy, or variable resource — only the four SPIFFE-platform resources (`swa_trust_domain`, `swa_server_group`, `swa_node_group`, `swa_server`). Conjur policy / variables / authenticators are managed via the separate **`cyberark/conjur`** Terraform provider, from the public registry. This matches Joe's documented preference in `~/Documents/Projects/panw/memory/cyberark-tenant.md` ("For Conjur Cloud (Secrets Manager SaaS): prefer Terraform `cyberark/conjur` provider"). Spec §7.1 amended; spec §16 OQ #3 RESOLVED.
 
-- [ ] **Step 1: Decide aggregate-vs-five-variables based on `SCHEMA.md`**
+- [ ] **Step 1: Add `cyberark/conjur` to `required_providers` in `main.tf`**
 
-```bash
-grep -E '^resource: swa_(authn|jwt|variable)' platform/terraform/SCHEMA.md
-```
-
-If you see `resource: swa_jwt_authenticator` (or similar with `jwt_authenticator` in the name), use the aggregate version (Step 2a). If you only see `swa_variable`, use the five-variables version (Step 2b).
-
-- [ ] **Step 2a: Aggregate `swa_jwt_authenticator`** (if available)
-
-`platform/terraform/30-jwt-authn.tf`:
+Open `platform/terraform/main.tf` and amend the `required_providers` block:
 
 ```hcl
-# 30-jwt-authn.tf — Configure the SM JWT authenticator service-id
-# `secureWorkloadAccess` to accept JWT-SVIDs minted by SWA for this trust domain.
-# Variables sourced from spec §6.3 table; SWA publishes a per-trust-domain JWKS.
+terraform {
+  required_version = ">= 1.6"
+  required_providers {
+    swa = {
+      source  = "cyberark/swa"
+      # version pinned from the install-terraform-provider.sh output
+    }
+    conjur = {
+      source  = "cyberark/conjur"
+      # version: leave unpinned for first run so the registry returns the latest stable.
+      # Once verified working, pin to that exact version for reproducibility.
+    }
+  }
+}
 
-resource "swa_jwt_authenticator" "swa" {
-  service_id          = "secureWorkloadAccess"
-  trust_domain        = swa_trust_domain.idira.name
-  jwks_uri            = "${var.sm_url}/api/swa/trust-domains/${var.trust_domain}/.well-known/jwks"
-  issuer              = "${var.sm_url}/api/swa/trust-domains/${var.trust_domain}"
-  token_app_property  = "sub"
-  identity_path       = "data/swa/trust-domains/${var.trust_domain}/workloads"
-  audience            = "conjur"
+provider "swa"    {}
+provider "conjur" {}
+```
+
+Both providers authenticate via the same env vars set by the Makefile (`CONJUR_APPLIANCE_URL`, `CONJUR_AUTHN_TOKEN`). Verify on first `terraform init`. If the `cyberark/conjur` provider needs different env var names, surface that to the lead — likely cases are `CONJUR_ACCOUNT` (the appliance account, defaults to `conjur` for SaaS) or `CONJUR_AUTHENTICATOR` (defaults to `authn`). Add what's needed.
+
+- [ ] **Step 2: `terraform init` to pull `cyberark/conjur`**
+
+```bash
+$(TF) init -upgrade
+```
+
+Expected: Terraform downloads `cyberark/conjur vX.Y.Z` from the registry alongside the already-installed local `cyberark/swa`. If the download fails (network, registry, etc.), surface to lead.
+
+- [ ] **Step 3: Discover the `cyberark/conjur` provider's resource and attribute names**
+
+The plan can't pre-encode resource names from a provider we hadn't planned for. Run schema discovery:
+
+```bash
+$(TF) providers schema -json | jq -r '
+  .provider_schemas
+  | to_entries[]
+  | select(.key | test("cyberark/conjur"))
+  | .value.resource_schemas
+  | keys[]
+' | sort -u
+```
+
+Expected: at minimum `conjur_policy` and either `conjur_secret` or `conjur_variable`. The JWT authenticator may be `conjur_authn_jwt` (likely) or configured via a `conjur_policy` body (very likely — JWT authenticators in Conjur SaaS are conventionally policy-loaded, not first-class resources).
+
+Append a section to `platform/terraform/SCHEMA.md`:
+```
+## cyberark/conjur resources (discovered 2026-05-27)
+<paste the list>
+```
+
+- [ ] **Step 4: Create `30-jwt-authn.tf`** — wire the authn-jwt service-id `secureWorkloadAccess` per spec §6.3
+
+Based on what Step 3 shows, write ONE of these two shapes. **Pick whichever your discovery confirms exists** — do not invent a `conjur_authn_jwt` resource if it's not in the schema; fall back to a `conjur_policy` that loads the YAML body.
+
+**Shape A — first-class `conjur_authn_jwt` resource** (if discovery confirms it):
+
+```hcl
+# 30-jwt-authn.tf — Configure Conjur authn-jwt service-id `secureWorkloadAccess`.
+# Per spec §6.3: the five variables (jwks-uri, issuer, token-app-property, identity-path, audience).
+# `jwks-uri` points at SWA's per-trust-domain JWKS (not kind's; that's M1 §7.3).
+
+resource "conjur_authn_jwt" "swa" {
+  service_id         = "secureWorkloadAccess"
+  jwks_uri           = "${var.sm_url}/api/swa/trust-domains/${var.trust_domain}/.well-known/jwks"
+  issuer             = "${var.sm_url}/api/swa/trust-domains/${var.trust_domain}"
+  token_app_property = "sub"
+  identity_path      = "data/swa/trust-domains/${var.trust_domain}/workloads"
+  audience           = "conjur"
+}
+```
+
+**Shape B — `conjur_policy` loading a YAML body** (canonical Conjur pattern; almost certainly the right shape if Shape A's resource doesn't exist):
+
+```hcl
+# 30-jwt-authn.tf — Load Conjur policy that configures authn-jwt/secureWorkloadAccess.
+# Per spec §6.3: five variables + the service-id resource itself.
+
+resource "conjur_policy" "authn_jwt_swa" {
+  policy_id = "conjur"           # root branch
+  policy    = <<-YAML
+    - !policy
+      id: conjur/authn-jwt/secureWorkloadAccess
+      body:
+        - !webservice
+        - !variable jwks-uri
+        - !variable issuer
+        - !variable token-app-property
+        - !variable identity-path
+        - !variable audience
+        - !group consumers
+        - !permit
+          role: !group consumers
+          privileges: [ read, authenticate ]
+          resource: !webservice
+  YAML
+}
+
+# Set the five variable values (resource name from your discovery — likely `conjur_secret` or `conjur_variable`).
+locals {
+  authn_jwt_base = "conjur/authn-jwt/secureWorkloadAccess"
+  authn_jwt_vars = {
+    "jwks-uri"           = "${var.sm_url}/api/swa/trust-domains/${var.trust_domain}/.well-known/jwks"
+    "issuer"             = "${var.sm_url}/api/swa/trust-domains/${var.trust_domain}"
+    "token-app-property" = "sub"
+    "identity-path"      = "data/swa/trust-domains/${var.trust_domain}/workloads"
+    "audience"           = "conjur"
+  }
+}
+
+resource "conjur_secret" "authn_jwt" {   # or conjur_variable — match discovery
+  for_each = local.authn_jwt_vars
+  variable = "${local.authn_jwt_base}/${each.key}"
+  value    = each.value
+
+  depends_on = [conjur_policy.authn_jwt_swa]
 }
 ```
 
@@ -1346,44 +1443,12 @@ Add `var.sm_url` to `variables.tf`:
 
 ```hcl
 variable "sm_url" {
-  description = "Secrets Manager – SaaS base URL (no trailing slash)."
+  description = "Secrets Manager – SaaS base URL (no trailing slash). Passed via -var from Makefile."
   type        = string
 }
 ```
 
 The Make target (`tf-apply-app`, Task 13) will pass this via `-var sm_url=$(PANW_SM_URL)`.
-
-- [ ] **Step 2b: Five `swa_variable` resources** (only if the aggregate isn't available)
-
-```hcl
-# 30-jwt-authn.tf — five Conjur variables that configure authn-jwt/secureWorkloadAccess.
-locals {
-  authn_jwt_base = "conjur/authn-jwt/secureWorkloadAccess"
-}
-
-resource "swa_variable" "jwt_jwks_uri" {
-  id    = "${local.authn_jwt_base}/jwks-uri"
-  value = "${var.sm_url}/api/swa/trust-domains/${var.trust_domain}/.well-known/jwks"
-}
-resource "swa_variable" "jwt_issuer" {
-  id    = "${local.authn_jwt_base}/issuer"
-  value = "${var.sm_url}/api/swa/trust-domains/${var.trust_domain}"
-}
-resource "swa_variable" "jwt_tokenappprop" {
-  id    = "${local.authn_jwt_base}/token-app-property"
-  value = "sub"
-}
-resource "swa_variable" "jwt_identitypath" {
-  id    = "${local.authn_jwt_base}/identity-path"
-  value = "data/swa/trust-domains/${var.trust_domain}/workloads"
-}
-resource "swa_variable" "jwt_audience" {
-  id    = "${local.authn_jwt_base}/audience"
-  value = "conjur"
-}
-```
-
-(The attribute name may be `name` or `path` instead of `id` — substitute against `SCHEMA.md`.)
 
 - [ ] **Step 3: `terraform validate`**
 
@@ -1402,91 +1467,64 @@ git commit -m "feat(m2): tf 30-jwt-authn — sm jwt authenticator (secureWorkloa
 
 ---
 
-## Task 12: `40-policy.tf` — SM policy scoped to carrier SPIFFE ID
+## Task 12: `40-policy.tf` — Conjur policy scoped to carrier SPIFFE ID (AMENDED 2026-05-27)
 
 **Files:**
 - Create: `platform/terraform/40-policy.tf`
 
-Policy: declare a host whose ID = the carrier's SPIFFE ID, make it a consumer of `authn-jwt/secureWorkloadAccess`, and grant `read` on the one variable. The exact resource for "load policy" depends on the bundled provider; common shapes: a `swa_policy` resource with `body` HCL/YAML, or several `swa_*_role`/`swa_*_grant` resources. Discovery via `SCHEMA.md`.
+Per Task 11's amendment, this uses the **`cyberark/conjur`** provider, not `cyberark/swa`. Policy: declare a host whose ID = the carrier's SPIFFE ID, make it a consumer of `authn-jwt/secureWorkloadAccess`, and grant `read` on the one variable. Canonical Conjur shape is a YAML policy body loaded via `conjur_policy`.
 
-- [ ] **Step 1: Check `SCHEMA.md` for a policy resource**
-
-```bash
-grep -E '^resource: swa_(policy|host|role|grant|grant_role|permission)' platform/terraform/SCHEMA.md
-```
-
-- [ ] **Step 2a: Aggregate `swa_policy` (loadable body)** (if available)
+- [ ] **Step 1: Create `40-policy.tf`**
 
 ```hcl
-# 40-policy.tf — Conjur policy scoped to the carrier workload's SPIFFE ID.
-# Loads under data/swa/trust-domains/idira.demo/workloads (the identity-path
+# 40-policy.tf — Conjur policy scoping the carrier's SPIFFE ID to one secret.
+# Loaded under data/swa/trust-domains/${trust_domain}/workloads (the identity-path
 # configured on the JWT authenticator in 30-jwt-authn.tf).
 
 locals {
   carrier_spiffe_id = "spiffe://${var.trust_domain}/${var.node_group}/ns/swa-demo/sa/carrier"
-  secret_branch     = "swa-demo/carrier"
+  workloads_branch  = "data/swa/trust-domains/${var.trust_domain}/workloads"
 }
 
-resource "swa_policy" "carrier" {
-  branch = "data/swa/trust-domains/${var.trust_domain}/workloads"
-  body = <<-YAML
+resource "conjur_policy" "carrier" {
+  policy_id = local.workloads_branch
+  policy    = <<-YAML
     - !host
       id: ${local.carrier_spiffe_id}
       annotations:
         description: "Idira SWA demo carrier service"
 
     - !grant
-      role: !group conjur/authn-jwt/secureWorkloadAccess/consumers
+      role: !group /conjur/authn-jwt/secureWorkloadAccess/consumers
       member: !host ${local.carrier_spiffe_id}
 
     - !permit
       role: !host ${local.carrier_spiffe_id}
       privileges: [ read, execute ]
-      resource: !variable ${local.secret_branch}/api-key
+      resource: !variable swa-demo/carrier/api-key
   YAML
+
+  depends_on = [conjur_policy.authn_jwt_swa]   # if Task 11 used Shape B
+  # If Task 11 used Shape A (first-class conjur_authn_jwt), replace with
+  # `depends_on = [conjur_authn_jwt.swa]`
 }
 ```
 
-- [ ] **Step 2b: Discrete grants** (fallback if no `swa_policy` resource)
+(The `conjur_policy` attribute names — `policy_id`, `policy` — are the canonical `cyberark/conjur` provider shape. Verify against Task 11 Step 3's discovery output; substitute if different.)
 
-```hcl
-# 40-policy.tf — discrete grants (no aggregate policy resource available).
-
-locals {
-  carrier_spiffe_id = "spiffe://${var.trust_domain}/${var.node_group}/ns/swa-demo/sa/carrier"
-}
-
-resource "swa_host" "carrier" {
-  id = local.carrier_spiffe_id
-}
-
-resource "swa_grant" "carrier_consumer" {
-  role   = "group:conjur/authn-jwt/secureWorkloadAccess/consumers"
-  member = "host:${local.carrier_spiffe_id}"
-}
-
-resource "swa_permit" "carrier_reads_apikey" {
-  role       = "host:${local.carrier_spiffe_id}"
-  resource   = "variable:swa-demo/carrier/api-key"
-  privileges = ["read", "execute"]
-}
-```
-
-Substitute the actual resource and attribute names from `SCHEMA.md`.
-
-- [ ] **Step 3: Validate**
+- [ ] **Step 2: Validate**
 
 ```bash
 terraform -chdir=platform/terraform validate
 ```
 
-Expected: `Success!`. If a referenced resource doesn't exist, fall back to the other branch in Step 2.
+Expected: `Success!`. If `conjur_policy` doesn't exist in the discovered schema, that's a real surprise — surface to lead before guessing alternatives.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add platform/terraform/40-policy.tf
-git commit -m "feat(m2): tf 40-policy — scope carrier spiffe id to one secret"
+git commit -m "feat(m2): tf 40-policy — scope carrier spiffe id to one secret (cyberark/conjur)"
 ```
 
 ---
@@ -1498,7 +1536,7 @@ git commit -m "feat(m2): tf 40-policy — scope carrier spiffe id to one secret"
 - Modify: `platform/terraform/outputs.tf` (add `carrier_secret_id`, `carrier_host_id`)
 - Modify: `Makefile` (replace `tf-apply-app` stub)
 
-- [ ] **Step 1: `50-secret.tf`** (using `swa_variable`; substitute attribute names against `SCHEMA.md`)
+- [ ] **Step 1: `50-secret.tf`** (using `cyberark/conjur` provider — resource name is whichever Task 11 Step 3 discovered: most likely `conjur_secret` or `conjur_variable`)
 
 ```hcl
 # 50-secret.tf — the actual secret value the carrier reads.
@@ -1519,16 +1557,16 @@ resource "random_password" "carrier_api_key" {
   }
 }
 
-resource "swa_variable" "carrier_api_key" {
-  id    = "swa-demo/carrier/api-key"
-  value = random_password.carrier_api_key.result
+# Resource name: substitute `conjur_secret` or `conjur_variable` based on Task 11 Step 3.
+# Attribute name for the variable path: most likely `variable` or `name`; substitute from discovery.
+resource "conjur_secret" "carrier_api_key" {
+  variable = "swa-demo/carrier/api-key"
+  value    = random_password.carrier_api_key.result
 
-  # Ensure policy is in place first (the variable lives under the policy's branch).
-  depends_on = [swa_policy.carrier]   # or the discrete grants from 40-policy.tf path b
+  # Ensure the policy declaring this variable is in place first.
+  depends_on = [conjur_policy.carrier]
 }
 ```
-
-If using path 2b in Task 12 (no `swa_policy`), change `depends_on` to `[swa_permit.carrier_reads_apikey]`.
 
 - [ ] **Step 2: Modify `outputs.tf`** (append)
 
@@ -1540,7 +1578,7 @@ output "carrier_host_id" {
 
 output "carrier_secret_id" {
   description = "The Conjur variable ID containing the carrier API key."
-  value       = swa_variable.carrier_api_key.id
+  value       = conjur_secret.carrier_api_key.variable   # substitute attribute per Task 11 Step 3 discovery
 }
 ```
 

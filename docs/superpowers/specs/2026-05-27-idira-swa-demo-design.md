@@ -172,20 +172,24 @@ The SM policy in §7 restricts the carrier's SPIFFE ID (`spiffe://idira.demo/kin
 
 ```
 platform/terraform/
-├── main.tf              # terraform { required_providers { swa = { source = "cyberark/swa", version = "0.1.0-…" } } }; provider "swa" {}
+├── main.tf              # required_providers: cyberark/swa (bundled, SPIFFE platform layer only)
+│                        #                  AND cyberark/conjur (from public registry, Conjur policy/variables/authn-jwt)
 ├── variables.tf         # trust_domain (default "idira.demo"), server_group (default "kind-sg"),
 │                        # node_group (default "kind-ng" — must match podLabels.swa_nodegroup in agent values),
 │                        # server_name (default "swa-server-kind"), kind_cluster (default "kind-swa"),
 │                        # sm_secret_id (default "swa-demo/carrier/api-key")
-├── 10-spiffe.tf         # swa_trust_domain, swa_server_group (k8s_psat), swa_node_group
-├── 20-server.tf         # swa_server with inline public_keys from data.external.kind_oidc
-├── 30-jwt-authn.tf      # SM authn-jwt/secureWorkloadAccess: loads Conjur policy with the five variables
-│                        #   from §6.3 (jwks-uri, issuer, token-app-property=sub, identity-path, audience)
-├── 40-policy.tf         # SM policy: host scoped to the carrier's SPIFFE ID (sub claim match);
-│                        #   consumer of authn-jwt/secureWorkloadAccess; read on the one variable
-├── 50-secret.tf         # swa_variable "swa-demo/carrier/api-key" = local.api_key
+├── 10-spiffe.tf         # swa_trust_domain, swa_server_group (k8s_psat), swa_node_group   [cyberark/swa]
+├── 20-server.tf         # swa_server with inline public_keys from data.external.kind_oidc [cyberark/swa]
+├── 30-jwt-authn.tf      # Conjur authn-jwt service-id "secureWorkloadAccess" + its five
+│                        #   policy vars from §6.3 (jwks-uri, issuer, token-app-property=sub,
+│                        #   identity-path, audience)                                       [cyberark/conjur]
+├── 40-policy.tf         # Conjur policy: host scoped to the carrier's SPIFFE ID;
+│                        #   consumer of authn-jwt/secureWorkloadAccess; read on one var    [cyberark/conjur]
+├── 50-secret.tf         # conjur_secret/conjur_variable "swa-demo/carrier/api-key"         [cyberark/conjur]
 └── outputs.tf           # authn_id (for helm), carrier_host_id, secret_id
 ```
+
+> **Why two providers (amended 2026-05-27):** the bundled `cyberark/swa` provider only ships SPIFFE-platform resources (`swa_trust_domain`, `swa_server_group`, `swa_node_group`, `swa_server` — verified via `terraform providers schema -json`). It does **not** ship a JWT-authenticator, policy, or variable resource (closing spec §16 OQ #3). Conjur policy / variables / authenticators are managed via the separate `cyberark/conjur` Terraform provider from the public registry. This is the canonical preference per Joe's `~/Documents/Projects/panw/memory/cyberark-tenant.md` ("For Conjur Cloud (Secrets Manager SaaS): prefer Terraform `cyberark/conjur` provider; fall back to `conjur` CLI; never `ark` for SM"). Both providers authenticate with the same `CONJUR_APPLIANCE_URL` + `CONJUR_AUTHN_TOKEN` env vars (verify on first `terraform init` for the conjur provider — adjust if wrong).
 
 ### 7.2 Two-apply pattern
 
@@ -648,7 +652,7 @@ Failure modes that must be handled (and shown in the inspector, not just logged)
 
 1. **Exact TF resource names** in the bundled provider (`swa_trust_domain` etc.). The bundle does **not** ship provider docs (`swa-release-1.0.4/terraform-provider/` contains only the per-platform binaries plus `SHA256SUMS*` — verified). Discovery path in M1: install the provider, write a stub `provider "swa" {}` block, then `terraform providers schema -json | jq '.provider_schemas[] | keys'`. Fall back to `strings ./terraform-provider-swa_* | grep -E '^swa_'` and the bundled binary's `--help` if available.
 2. **~~`PANW_OIDC_APP_SCOPE` value~~ — RESOLVED 2026-05-27.** The operator's auth flow uses Service User `client_credentials` against `/Oauth2/Token/__idaptive_cybr_user_oidc` with **`scope=api`** (not `conjur`). Credentials come from Conceal at `infamousdev/claudecode/client_id|secret`, surfaced via `summon -p conceal_summon`. The Identity URL is discovered via Platform Discovery (`https://platform-discovery.cyberark.cloud/api/v2/services/subdomain/<subdomain>`) — `<subdomain>.id.cyberark.cloud` does NOT exist; the real Identity URL uses a tenant ID like `ack4386.id.cyberark.cloud`. See §6.1 and `~/Documents/Projects/panw/memory/cyberark-tenant.md`.
-3. **JWT authenticator configuration mechanism** — the docs page (`swa-docs/pages/cjr-authn-jwt-swa.md`) shows the authenticator being configured by setting five Conjur-style variables via `conjur variable set`. The TF provider almost certainly exposes a `swa_variable` resource (per `50-secret.tf`) that we reuse to set those five — but it may also expose a higher-level `swa_jwt_authenticator` aggregate. Discovery path in M1: enumerate resources via the same `terraform providers schema` invocation as OQ #1; prefer the aggregate if it exists, otherwise five `swa_variable` resources under `conjur/authn-jwt/secureWorkloadAccess/*`.
+3. **~~JWT authenticator configuration mechanism~~ — RESOLVED 2026-05-27.** The bundled `cyberark/swa` provider does NOT ship a JWT-authenticator, policy, or variable resource — verified by `terraform providers schema -json` (only `swa_trust_domain`, `swa_server_group`, `swa_node_group`, `swa_server` exist). Conjur policy / variables / authenticators are managed via the separate `cyberark/conjur` Terraform provider from the public registry. See §7.1 amendment.
 4. **Inline JWKS staleness on SWA Server registration** — kind rotates its serving cert on cluster restart. The `20-server.tf` registration embeds kind's JWKS inline at apply time. `make up` re-applies `20-server.tf` which re-reads the JWKS, but if the operator restarts the kind cluster without `make up`, the SWA Server will fail to PSAT-attest. Document in README; `make restart` should trigger a partial re-apply. *Note: this affects only the SWA Server's bootstrap PSAT path — the workload JWT authenticator in §6.3 uses SWA's per-trust-domain JWKS, which is published by SWA itself and is not affected by kind restarts.*
 5. **Token expiry mid-demo** — the carrier caches its SM access token (8 min TTL per docs) but doesn't currently refresh. Acceptable for a demo (a single click is sub-second), but the README should note it. The two-hop OAuth helper (§6.1) operator token is similarly short-lived (≤15 min) and is re-fetched per Make target.
 6. **Audience claim consistency** — the JWT-SVID `audience`, the JWT authenticator `audience` variable, and the SWA Server chart's `controlPlane.auth.audience` must all match. Spec uses `conjur` everywhere (chart default). If any of the three are overridden in the future, all three must be updated together.

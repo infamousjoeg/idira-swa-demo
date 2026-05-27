@@ -10,7 +10,7 @@ All non-trivial implementation work in this repo is built by **Claude Code agent
 
 - **Lead** — the active Claude Code session. Spawns the team, assigns tasks, synthesizes results, decides when to advance to the next milestone.
 - **`builder-M{n}`** — `general-purpose` agent type, full tool access. Executes the milestone's plan task-by-task. Marks tasks completed in the shared task list and DMs the validator when done.
-- **`validator-M{n}`** — `general-purpose` agent type, spawned in **plan mode** (read-only). Grades the builder's diff against the 10-criterion rubric in spec §13.4. PASS at ≥9/10 advances; below, the validator creates revision tasks back to the builder (hard cap: 3 revision cycles).
+- **`validator-M{n}`** — `general-purpose` agent type, spawned with `mode: "bypassPermissions"` so its verification commands (kubectl, terraform plan/show, make smoke, curl against tenant) don't pile up prompts on the lead. The validator's read-only discipline is enforced via the prompt ("you describe bugs in revision tasks, you do NOT fix them"), not by plan-mode gating — the trade was made on 2026-05-27 because per-command prompts dominated wall time during M1. Grades against spec §13.4 (10 criteria, PASS ≥9). Below threshold: creates revision tasks back to the builder; hard cap 3 cycles.
 
 Builder and validator shut down after each milestone passes (`Ask <name> to shut down`); the next milestone spawns a fresh pair. This bounds context bleed and token cost.
 
