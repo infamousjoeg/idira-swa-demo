@@ -141,8 +141,15 @@ build-apps: ## Build the demo app images locally and load into kind
 	docker build -t idira/carrier:m2 apps/carrier/
 	kind load docker-image idira/carrier:m2 --name $(KIND_CLUSTER)
 
-deploy-apps: ## Deploy demo app manifests into swa-demo
-	@echo 'deploy-apps: stub — implemented in M2 Task 10/14'
+deploy-apps: ## Deploy the demo app manifests into swa-demo
+	kubectl apply -f platform/k8s/namespace.yaml
+	@kubectl -n swa-demo create configmap carrier-config \
+	  --from-literal=sm_url=$(PANW_SM_URL) \
+	  --from-literal=secret_id=swa-demo/carrier/api-key \
+	  --dry-run=client -o yaml | kubectl apply -f -
+	kubectl apply -f platform/k8s/carrier.deployment.yaml
+	kubectl apply -f platform/k8s/carrier.service.yaml
+	kubectl -n swa-demo rollout status deploy/carrier --timeout=2m
 
 smoke-m2: ## Run M2 acceptance check
 	@./scripts/smoke-m2.sh

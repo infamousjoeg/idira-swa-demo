@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: carrier
+  namespace: swa-demo
+  labels: {app: carrier}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: carrier}}
+  template:
+    metadata:
+      labels: {app: carrier}
+    spec:
+      serviceAccountName: carrier
+      containers:
+        - name: carrier
+          image: idira/carrier:m2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8443
+              name: http
+          env:
+            - name: PANW_SM_URL
+              valueFrom:
+                configMapKeyRef: {name: carrier-config, key: sm_url}
+            - name: CARRIER_SECRET_ID
+              valueFrom:
+                configMapKeyRef: {name: carrier-config, key: secret_id}
+            - name: SPIFFE_ENDPOINT_SOCKET
+              value: unix:///run/swa-agent/api.sock
+          volumeMounts:
+            - name: swa-agent-socket
+              mountPath: /run/swa-agent
+              readOnly: true
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 2
+            periodSeconds: 5
+      volumes:
+        - name: swa-agent-socket
+          hostPath:
+            path: /tmp/swa-agent/public
+            type: Directory
