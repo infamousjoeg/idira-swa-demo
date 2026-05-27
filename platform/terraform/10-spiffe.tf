@@ -24,6 +24,11 @@ resource "swa_trust_domain" "idira" {
 resource "swa_server_group" "kind_sg" {
   name              = var.server_group
   trust_domain_name = swa_trust_domain.idira.name
+  # Explicit empty description: provider bug rev v0.1.0-0d54f57b-758 returns
+  # `description = ""` post-apply even when HCL omits it, causing Terraform
+  # to error on "inconsistent result after apply" (was null, now ""). Setting
+  # the field explicitly to a string keeps plan and apply state aligned.
+  description = "kind-laptop server group (k8s_psat) — M1"
 
   node_attestation = {
     k8s_psat = {
@@ -52,6 +57,8 @@ resource "swa_node_group" "kind_ng" {
   name              = var.node_group
   trust_domain_name = swa_trust_domain.idira.name
   server_group_name = swa_server_group.kind_sg.name
+  # See swa_server_group: same "was null, now \"\"" provider quirk.
+  description = "kind-laptop node group — M1"
 
   # REQUIRED — schema enum is "unix" | "kubernetes". Drives the default
   # SPIFFE ID template and variable-prefix conventions.
