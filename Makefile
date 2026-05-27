@@ -24,7 +24,8 @@ export SUMMON_YAML
 SUMMON = summon -p conceal_summon --yaml "$$SUMMON_YAML"
 
 .DEFAULT_GOAL := help
-.PHONY: help doctor tf-token down install-tf-provider cluster images _check-env
+.PHONY: help doctor tf-token down install-tf-provider cluster images \
+        tf-init tf-apply-platform _check-env
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z_-]+:.*##/{printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -48,6 +49,27 @@ install-tf-provider: ## Install cyberark/swa terraform provider from the bundle
 
 images: ## Load bundled SWA images into the kind cluster (delegates to bundle Makefile)
 	$(MAKE) -C swa-release-1.0.4 kind-load-images KIND_CLUSTER=$(KIND_CLUSTER)
+
+tf-init: install-tf-provider ## terraform init (after provider is installed)
+	$(TF) init -upgrade
+
+# tf-apply-platform — apply only the platform-side subset (10-spiffe + 20-server).
+# Workload-side resources (30/40/50) belong to M2 and are not present yet.
+# `-target` is used per spec §7.2 (two-apply pattern).
+# The CONJUR_AUTHN_TOKEN is captured once into a $$tok shell var so it isn't
+# echoed on the command line (visible to `ps`); summon injects the underlying
+# CLIENT_ID/CLIENT_SECRET from Keychain via conceal_summon.
+tf-apply-platform: _check-env tf-init ## Apply TF subset #1: SPIFFE hierarchy + server registration
+	@$(SUMMON) -- bash -c '\
+	  set -euo pipefail; \
+	  tok=$$(./scripts/get-sm-token.sh); \
+	  CONJUR_APPLIANCE_URL=$(PANW_SM_URL) CONJUR_AUTHN_TOKEN=$$tok \
+	    $(TF) apply -auto-approve \
+	      -target=swa_trust_domain.idira \
+	      -target=swa_server_group.kind_sg \
+	      -target=swa_node_group.kind_ng \
+	      -target=swa_server.kind'
+	@$(TF) output -json | jq -r '"login_url = " + .login_url.value'
 
 cluster: ## Create the kind cluster ($(KIND_CLUSTER)) if not present
 	@if kind get clusters | grep -qx "$(KIND_CLUSTER)"; then \
