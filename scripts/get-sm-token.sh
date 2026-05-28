@@ -17,7 +17,7 @@ identity_url=$(curl -fsSL --max-time 10 \
 
 # Step 2 — Mint Service User Identity JWT. The endpoint is /Oauth2/Token/<app_id>
 # (camelCase). `__idaptive_cybr_user_oidc` is the cross-tenant default Service
-# User OAuth client; verified present on `infamous`. Auth is HTTP Basic.
+# User OAuth client (present on every CyberArk Identity tenant). Auth is HTTP Basic.
 identity_jwt=$(curl -fsSL --max-time 10 -X POST \
   "${identity_url}/Oauth2/Token/__idaptive_cybr_user_oidc" \
   -u "${CLIENT_ID}:${CLIENT_SECRET}" \

@@ -114,10 +114,8 @@ fi
 # ---- Tenant-side check (mints its own base64 token — see deviation #3) ------
 
 step 'SaaS tenant has trust_domain=idira.demo (control-plane round-trip)'
-sm_b64_token=$(summon -p conceal_summon --yaml '
-CLIENT_ID: !var infamousdev/claudecode/client_id
-CLIENT_SECRET: !var infamousdev/claudecode/client_secret
-' -- bash -c '
+: "${CONCEAL_NAMESPACE:?set in .envrc (Keychain namespace holding client_id+client_secret)}"
+sm_b64_token=$(summon -p conceal_summon --yaml "$(printf 'CLIENT_ID: !var %s/client_id\nCLIENT_SECRET: !var %s/client_secret' "$CONCEAL_NAMESPACE" "$CONCEAL_NAMESPACE")" -- bash -c '
   set -euo pipefail
   identity_url=$(curl -fsSL --max-time 10 \
     "https://platform-discovery.cyberark.cloud/api/v2/services/subdomain/${PANW_SM_TENANT}" \

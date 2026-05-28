@@ -1,10 +1,23 @@
 # .envrc.example — copy to .envrc and fill in. .envrc is gitignored.
 # Only non-secret env lives here. Secrets are read from macOS Keychain via
-# Conceal at infamousdev/claudecode/client_id|secret, injected into
-# tenant-touching commands via `summon -p conceal_summon`.
+# Conceal, injected into tenant-touching commands via `summon -p conceal_summon`.
+# The Identity-tenant URL is discovered at runtime via Platform Discovery
+# (https://platform-discovery.cyberark.cloud/api/v2/services/subdomain/$PANW_SM_TENANT)
+# so the only subdomain you set here is the SM SaaS one.
 
-# Secrets Manager SaaS tenant subdomain (without `.secretsmgr.cyberark.cloud`):
-export PANW_SM_TENANT=infamous
+# Your CyberArk Secrets Manager SaaS tenant subdomain (the part before
+# `.secretsmgr.cyberark.cloud`). Example: if your tenant URL is
+# https://acme.secretsmgr.cyberark.cloud then set this to "acme".
+export PANW_SM_TENANT=<your-subdomain>
+
+# The Conceal-backed Keychain namespace where your CyberArk Service User
+# credentials live. The Makefile and scripts expect two keys under this
+# namespace:  <namespace>/client_id  and  <namespace>/client_secret.
+# Example: if you ran
+#     conceal set acme/swa-demo/client_id  <login>
+#     conceal set acme/swa-demo/client_secret <api-key>
+# then set this to "acme/swa-demo".
+export CONCEAL_NAMESPACE=<your-keychain-namespace>
 
 # Optional — kind cluster name (default "swa"):
 # export KIND_CLUSTER=swa

@@ -2,7 +2,8 @@ SHELL := bash
 .SHELLFLAGS := -euo pipefail -c
 
 # Required env (sourced from .envrc):
-#   PANW_SM_TENANT       (SM SaaS subdomain, e.g. "infamous")
+#   PANW_SM_TENANT       (SM SaaS subdomain — see .envrc.example)
+#   CONCEAL_NAMESPACE    (macOS Keychain namespace holding client_id+client_secret)
 # Optional:
 #   KIND_CLUSTER         (default "swa")
 #
@@ -14,14 +15,10 @@ TF           := terraform -chdir=platform/terraform
 
 # SUMMON wraps a command, injecting CLIENT_ID + CLIENT_SECRET into its env from
 # Conceal-backed macOS Keychain. Provider flag is `conceal_summon` (not
-# `conceal` — see vault memory cyberark-tenant.md 2026-05-27). Multiline yaml
-# is intentional: Make passes it as one arg to summon.
-define SUMMON_YAML
-CLIENT_ID: !var infamousdev/claudecode/client_id
-CLIENT_SECRET: !var infamousdev/claudecode/client_secret
-endef
-export SUMMON_YAML
-SUMMON = summon -p conceal_summon --yaml "$$SUMMON_YAML"
+# `conceal`). The Keychain namespace is parameterized via $(CONCEAL_NAMESPACE)
+# — `make _check-env` requires it. printf builds the YAML at call time so
+# $(CONCEAL_NAMESPACE) is properly Make-expanded into both `!var` lines.
+SUMMON = summon -p conceal_summon --yaml "$$(printf 'CLIENT_ID: !var %s/client_id\nCLIENT_SECRET: !var %s/client_secret' '$(CONCEAL_NAMESPACE)' '$(CONCEAL_NAMESPACE)')"
 
 .DEFAULT_GOAL := help
 .PHONY: help doctor tf-token down install-tf-provider cluster images \
@@ -35,7 +32,8 @@ doctor: ## Verify prerequisites
 	@./scripts/doctor.sh
 
 _check-env:
-	@: "$${PANW_SM_TENANT:?set in .envrc}"
+	@: "$${PANW_SM_TENANT:?set in .envrc (see .envrc.example)}"
+	@: "$${CONCEAL_NAMESPACE:?set in .envrc (see .envrc.example) — Keychain namespace holding client_id+client_secret}"
 
 tf-token: _check-env ## Print env exports to source for manual `terraform` use
 	@echo "export CONJUR_APPLIANCE_URL=$(PANW_SM_URL)"

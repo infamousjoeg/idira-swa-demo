@@ -66,26 +66,33 @@ if [[ -f .envrc ]]; then
   # shellcheck disable=SC1091
   source .envrc
   set -u
-  if [[ -z "${PANW_SM_TENANT:-}" ]]; then
-    printf '  [MISSING] $PANW_SM_TENANT\n'; fail=$((fail+1))
-  else
-    printf '  [ok]      $PANW_SM_TENANT=%s\n' "$PANW_SM_TENANT"
-  fi
+  for v in PANW_SM_TENANT CONCEAL_NAMESPACE; do
+    if [[ -z "${!v:-}" ]]; then
+      printf '  [MISSING] $%s — see .envrc.example\n' "$v"; fail=$((fail+1))
+    else
+      printf '  [ok]      $%s=%s\n' "$v" "${!v}"
+    fi
+  done
 else
-  printf '  [MISSING] .envrc — copy .envrc.example and fill in PANW_SM_TENANT\n'
+  printf '  [MISSING] .envrc — copy .envrc.example and fill in PANW_SM_TENANT + CONCEAL_NAMESPACE\n'
   fail=$((fail+1))
 fi
 
 echo
 echo 'Secrets (macOS Keychain via Conceal):'
-for path in 'infamousdev/claudecode/client_id' 'infamousdev/claudecode/client_secret'; do
-  if conceal get "$path" >/dev/null 2>&1; then
-    printf '  [ok]      conceal:%s\n' "$path"
-  else
-    printf '  [MISSING] conceal:%s — run `conceal set %s <value>`\n' "$path" "$path"
-    fail=$((fail+1))
-  fi
-done
+if [[ -n "${CONCEAL_NAMESPACE:-}" ]]; then
+  for key in client_id client_secret; do
+    path="${CONCEAL_NAMESPACE}/${key}"
+    if conceal get "$path" >/dev/null 2>&1; then
+      printf '  [ok]      conceal:%s\n' "$path"
+    else
+      printf '  [MISSING] conceal:%s — run `conceal set %s <value>`\n' "$path" "$path"
+      fail=$((fail+1))
+    fi
+  done
+else
+  printf '  [skip]    CONCEAL_NAMESPACE not set — cannot check keychain paths\n'
+fi
 
 echo
 echo 'Tenant reachability (Platform Discovery):'

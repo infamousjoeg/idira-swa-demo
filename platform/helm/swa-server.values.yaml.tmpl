@@ -19,7 +19,7 @@ image:
   pullPolicy: IfNotPresent         # kind has the image preloaded — never pull
 
 controlPlane:
-  url: ${PANW_SM_URL}              # e.g. https://infamous.secretsmgr.cyberark.cloud
+  url: ${PANW_SM_URL}              # e.g. https://<your-subdomain>.secretsmgr.cyberark.cloud
   auth:
     type: jwt                      # chart default; pinned to match SM JWT authn
     loginURL: ${SWA_LOGIN_URL}     # full Conjur authenticate URL (base64-encoded)

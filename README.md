@@ -24,16 +24,20 @@ Click **RESOLVE SECRET** and the inspector fills in within ~200 ms.
 - `node` ≥ 18 (for the M3 headless Playwright smoke)
 - `swa-release-1.0.4/` bundle in this directory (gitignored vendor drop)
 - A Secrets Manager – SaaS tenant. Copy `.envrc.example` to `.envrc` and set
-  `PANW_SM_TENANT`. **No secrets in `.envrc`** — Service User credentials live
-  in the macOS Keychain via Conceal at
-  `infamousdev/claudecode/client_id|secret` and are injected into
-  tenant-touching commands via `summon -p conceal_summon` (see spec §6.1).
+  `PANW_SM_TENANT` (your SM SaaS subdomain) and `CONCEAL_NAMESPACE` (the
+  Keychain path holding your CyberArk Service User credentials). **No secrets
+  in `.envrc`** — Service User credentials live in the macOS Keychain via
+  Conceal at `${CONCEAL_NAMESPACE}/client_id` and
+  `${CONCEAL_NAMESPACE}/client_secret`, and are injected into tenant-touching
+  commands via `summon -p conceal_summon` (see spec §6.1).
 - `make doctor` enforces the above.
 
 ## Quick start
 
 ```bash
-cp .envrc.example .envrc && vim .envrc      # set PANW_SM_TENANT
+cp .envrc.example .envrc && vim .envrc      # set PANW_SM_TENANT + CONCEAL_NAMESPACE
+conceal set "$CONCEAL_NAMESPACE/client_id"     <your-service-user-login>
+conceal set "$CONCEAL_NAMESPACE/client_secret" <your-service-user-api-key>
 direnv allow                                 # or source .envrc
 make doctor                                  # verify prerequisites
 make up                                      # full deploy + headless smoke (~4 min)
