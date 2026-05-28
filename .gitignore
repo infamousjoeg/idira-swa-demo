@@ -21,3 +21,18 @@ apps/carrier/carrier
 ui-tests/node_modules/
 ui-tests/test-results/
 ui-tests/playwright-report/
+apps/portal/portal
+out/
+
+# Pre-publish additions (2026-05-28)
+# Build/process artifacts that don't belong in a public repo:
+#   - docs/superpowers/ holds the brainstormed spec + plans + validator
+#     reports. Kept locally for reproducibility, not for redistribution.
+#   - swa-docs/secrets-manager-saas-api*.yaml is CyberArk's public API
+#     spec (downloaded from api-docs.cyberark.com) — referenceable, not
+#     redistributable.
+#   - Any PDFs that may sneak in (PANW brand guidelines, datasheets, etc.)
+#     are gitignored as a class.
+docs/superpowers/
+swa-docs/secrets-manager-saas-api*.yaml
+*.pdf

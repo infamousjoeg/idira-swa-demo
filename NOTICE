@@ -1,0 +1,28 @@
+Idira SWA Demo
+Copyright 2026 Joe Garcia
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this work except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+
+This work demonstrates the integration of:
+  - CyberArk Secure Workload Access (SWA) — vendor bundle, not redistributed.
+  - CyberArk Secrets Manager – SaaS (Conjur Cloud) — public REST API.
+  - Palo Alto Networks Idira brand identity — used per PANW brand guidelines.
+  - SPIFFE / SPIRE — workload identity standard via github.com/spiffe/go-spiffe.
+
+Third-party components used (each under its own license):
+  - kind (Apache 2.0)
+  - Helm (Apache 2.0)
+  - Terraform (BSL 1.1) and providers cyberark/swa, cyberark/conjur (Apache 2.0)
+  - Go and the Go standard library (BSD)
+  - github.com/spiffe/go-spiffe/v2 (Apache 2.0)
+  - Playwright (Apache 2.0)
+  - distroless base images by Google (Apache 2.0)
+  - Conceal + Summon (Apache 2.0) by CyberArk
