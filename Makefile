@@ -185,8 +185,11 @@ smoke-m2: ## Run M2 acceptance check
 up-m2: up-m1 build-apps deploy-apps tf-apply-app smoke-m2 ## Full M2 deploy + smoketest
 	@echo 'M2 ready.'
 
-.PHONY: portforward
+.PHONY: portforward smoke-m3
 
 portforward: ## Forward portal :8080 to localhost (blocks)
 	@echo 'Portal at http://localhost:8080 — Ctrl+C to stop'
 	kubectl -n swa-demo port-forward svc/portal 8080:8080
+
+smoke-m3: ## Run M3 acceptance check (headless browser)
+	@./scripts/smoke-ui.sh

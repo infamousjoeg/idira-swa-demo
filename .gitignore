@@ -16,3 +16,8 @@ platform/helm/*.values.yaml
 
 # M2 additions
 apps/carrier/carrier
+
+# M3 additions
+ui-tests/node_modules/
+ui-tests/test-results/
+ui-tests/playwright-report/
