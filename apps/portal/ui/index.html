@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Praetor Logistics — shipment lookup</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="split">
+  <!-- Left pane: the fictional consumer surface -->
+  <section class="pane pane--portal" aria-label="Praetor Logistics shipment lookup">
+    <header class="lockup">
+      <span class="lockup__mark">Idira</span>
+      <span class="lockup__sig">BY PALO ALTO NETWORKS</span>
+    </header>
+    <h1 class="headline">Workloads with real identity.</h1>
+    <p class="lede">Resolve a shipment using credentials the workload doesn't carry.</p>
+
+    <form id="resolveForm" class="resolve" novalidate>
+      <label for="shipmentId" class="resolve__label">Shipment ID</label>
+      <input id="shipmentId" name="shipment_id" type="text" autocomplete="off"
+        value="SHP-2049-883" required pattern="SHP-[A-Za-z0-9-]+">
+      <button type="submit" class="cta">RESOLVE SECRET</button>
+    </form>
+
+    <div id="result" class="result" aria-live="polite"></div>
+  </section>
+
+  <!-- Right pane: the Idira inspector -->
+  <aside class="pane pane--inspector" aria-label="Idira inspector">
+    <header class="inspector__head">
+      <span class="inspector__eyebrow">Idira inspector</span>
+      <span class="inspector__sub">spiffe / mtls / jwt-svid</span>
+    </header>
+    <ol id="trace" class="trace" aria-live="polite"></ol>
+  </aside>
+</div>
+<script type="module" src="portal.js"></script>
+<script type="module" src="inspector.js"></script>
+</body>
+</html>
