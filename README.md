@@ -2,7 +2,7 @@
 
 A Mac-laptop demo of **Palo Alto Networks' Idira Secure Workload Access (SWA)**: a real workload fetches a real secret from CyberArk Secrets Manager – SaaS without ever holding a static credential. The UI splits left/right so you can *watch* the identity exchange happen on every click.
 
-![Portal split view — left pane shows the Praetor Logistics shipment lookup form; right pane shows the Idira inspector with live trace events](docs/img/portal-resolved.png)
+![Portal split view. Left pane shows the Praetor Logistics shipment lookup form; right pane shows the Idira inspector with live trace events](docs/img/portal-resolved.png)
 
 ---
 
@@ -10,18 +10,18 @@ A Mac-laptop demo of **Palo Alto Networks' Idira Secure Workload Access (SWA)**:
 
 If terms like **SPIFFE**, **SVID**, **mTLS**, or **JWT authn** aren't second-nature yet, you'll get a lot more out of this demo after a quick visual tour:
 
-> **→ [thesecretlivesofidentity.com](https://thesecretlivesofidentity.com)** — interactive visualizations that demystify workload identity. Start with the SPIFFE explainer; it covers exactly the concepts this demo puts into motion.
+> **→ [thesecretlivesofidentity.com](https://thesecretlivesofidentity.com).** Interactive visualizations that demystify workload identity. Start with the SPIFFE explainer; it covers exactly the concepts this demo puts into motion.
 
 The 60-second version, just to keep reading:
 
-- **The problem.** Workloads (services, jobs, agents) need secrets — API keys, DB passwords, OAuth tokens. The traditional fix is to bake those secrets into environment variables, config files, or container images. That's a leak waiting to happen, and rotating the secret means redeploying everything that has a copy.
-- **The SPIFFE answer.** Give every workload a short-lived **cryptographic identity** instead — issued by a local agent on the node, scoped to that workload only, with no shared secret. The identity itself becomes proof of who the workload is. A secrets manager can then say "ok, *this* identity is allowed to read *this* secret" and hand it over on demand.
+- **The problem.** Workloads (services, jobs, agents) need secrets like API keys, DB passwords, OAuth tokens. The traditional fix is to bake those secrets into environment variables, config files, or container images. That's a leak waiting to happen, and rotating the secret means redeploying everything that has a copy.
+- **The SPIFFE answer.** Give every workload a short-lived **cryptographic identity** instead. It's issued by a local agent on the node, scoped to that workload only, with no shared secret. The identity itself becomes proof of who the workload is. A secrets manager can then say "ok, *this* identity is allowed to read *this* secret" and hand it over on demand.
 - **Two flavors of identity.** SPIFFE issues two kinds of credentials, called **SVIDs** (SPIFFE Verifiable IDs):
-  - **X.509-SVID** — a short-lived TLS certificate. Used for **mTLS** (mutual TLS) between services: both sides present a SVID and verify the other's SPIFFE ID before any application data flows.
-  - **JWT-SVID** — a short-lived signed JWT. Used to authenticate to systems that speak HTTP/REST (like Secrets Manager), where you can't do TLS mutual auth but you *can* present a signed token.
+  - **X.509-SVID** is a short-lived TLS certificate. Used for **mTLS** (mutual TLS) between services: both sides present a SVID and verify the other's SPIFFE ID before any application data flows.
+  - **JWT-SVID** is a short-lived signed JWT. Used to authenticate to systems that speak HTTP/REST (like Secrets Manager), where you can't do TLS mutual auth but you *can* present a signed token.
 - **Where Idira fits.** Idira SWA is Palo Alto Networks' commercial SPIFFE implementation: a control plane on the CyberArk Secrets Manager – SaaS tenant, plus an in-cluster server + agent that issue SVIDs to your workloads. This demo runs the whole stack end-to-end on a single kind cluster.
 
-That's all you need. If you want to go deeper — what attestation actually is, how trust domains work, why JWT-SVID audience claims matter — the visualizations at [thesecretlivesofidentity.com](https://thesecretlivesofidentity.com) are the fastest way in.
+That's all you need. If you want to go deeper into what attestation actually is, how trust domains work, or why JWT-SVID audience claims matter, the visualizations at [thesecretlivesofidentity.com](https://thesecretlivesofidentity.com) are the fastest way in.
 
 ---
 
@@ -29,12 +29,12 @@ That's all you need. If you want to go deeper — what attestation actually is, 
 
 Open `http://localhost:8080` after `make up && make portforward`:
 
-![Portal idle state — split view ready for a shipment ID](docs/img/portal-empty.png)
+![Portal idle state, split view ready for a shipment ID](docs/img/portal-empty.png)
 
-- **Left pane** — *Praetor Logistics* shipment-lookup portal. A plausible-looking internal app that looks up a shipment by ID. Type a shipment ID (e.g. `SHP-2049-883`), click **RESOLVE SECRET**.
-- **Right pane** — *Idira inspector*. A live trace of every identity hop the request triggers. Each event is a real thing happening: the portal opening an mTLS connection to the carrier, the carrier asking the local agent for a JWT-SVID, the carrier exchanging that JWT at Secrets Manager for an access token, the secret being fetched, the shipment being looked up.
+- **Left pane.** *Praetor Logistics* shipment-lookup portal. A plausible-looking internal app that looks up a shipment by ID. Type a shipment ID (e.g. `SHP-2049-883`), click **RESOLVE SECRET**.
+- **Right pane.** *Idira inspector.* A live trace of every identity hop the request triggers. Each event is a real thing happening: the portal opening an mTLS connection to the carrier, the carrier asking the local agent for a JWT-SVID, the carrier exchanging that JWT at Secrets Manager for an access token, the secret being fetched, the shipment being looked up.
 
-End-to-end click → result → fully-populated inspector takes ~200 ms. Nothing is mocked except the carrier's downstream "did you find the shipment" call (returns canned JSON from a fixture file).
+End-to-end click → result → fully-populated inspector takes ~200 ms. Nothing is mocked except the carrier's downstream "did you find the shipment" call, which returns canned JSON from a fixture file.
 
 ### The flow, step by step
 
@@ -52,13 +52,13 @@ What's *not* present anywhere: a hardcoded `API_KEY=…` env var, a mounted secr
 
 ## Prerequisites
 
-- macOS Apple Silicon (the bundled SWA container images are `arm64v8`-only for this demo)
-- On PATH: `docker`, `kind`, `kubectl`, `helm`, `terraform`, `jq`, `curl`, `envsubst`, `summon`, `conceal`
-- `node` ≥ 18 (for the headless Playwright smoke test)
-- A `swa-release-1.0.4/` bundle in this directory (gitignored vendor drop from CyberArk — not in this repo)
+- macOS Apple Silicon (the bundled SWA container images are `arm64v8`-only for this demo).
+- On PATH: `docker`, `kind`, `kubectl`, `helm`, `terraform`, `jq`, `curl`, `envsubst`, `summon`, `conceal`.
+- `node` ≥ 18 (for the headless Playwright smoke test).
+- A `swa-release-1.0.4/` bundle in this directory (gitignored vendor drop from CyberArk, not in this repo).
 - A CyberArk Secrets Manager – SaaS tenant with a Service User you can authenticate as. Copy `.envrc.example` to `.envrc` and set `PANW_SM_TENANT` (your SM SaaS subdomain) and `CONCEAL_NAMESPACE` (the Keychain path where you've stored the Service User credentials).
 
-**No secrets in `.envrc`.** Service User credentials live in the macOS Keychain via [Conceal](https://github.com/cyberark/conceal), under `${CONCEAL_NAMESPACE}/client_id` and `${CONCEAL_NAMESPACE}/client_secret`. Every tenant-touching command is wrapped in [`summon -p conceal_summon`](https://github.com/cyberark/summon) which injects them as env vars for that subprocess only — they're never on disk in cleartext and never visible to `ps`.
+**No secrets in `.envrc`.** Service User credentials live in the macOS Keychain via [Conceal](https://github.com/cyberark/conceal), under `${CONCEAL_NAMESPACE}/client_id` and `${CONCEAL_NAMESPACE}/client_secret`. Every tenant-touching command is wrapped in [`summon -p conceal_summon`](https://github.com/cyberark/summon), which injects them as env vars for that subprocess only. They're never on disk in cleartext and never visible to `ps`.
 
 `make doctor` enforces all the above (tools, host, env vars, Conceal-stored credentials, tenant reachability) and exits non-zero with a concrete diagnostic if anything's missing.
 
@@ -88,7 +88,7 @@ The first `make up` takes ~4 minutes because it has to load the bundled SWA cont
 
 ## Build it incrementally
 
-The whole demo lands in three milestones — you can run any of them in isolation:
+The whole demo lands in three milestones. You can run any of them in isolation:
 
 | Target | What it does | Time |
 |---|---|---|
@@ -119,30 +119,30 @@ Identity OAuth tokens are ≤15 min; SM access tokens are ~8 min. Every Make tar
 
 Three layers:
 
-1. **Control plane — CyberArk Secrets Manager – SaaS.** Holds the SPIFFE hierarchy (trust domain → server group → node group → server), signs SVIDs, holds the secret. Managed declaratively via two Terraform providers: [`cyberark/swa`](https://registry.terraform.io/providers/cyberark/swa/latest) (bundled, SPIFFE platform layer) and [`cyberark/conjur`](https://registry.terraform.io/providers/cyberark/conjur/latest) (public registry, Conjur policy / authenticator / secret).
+1. **Control plane: CyberArk Secrets Manager – SaaS.** Holds the SPIFFE hierarchy (trust domain → server group → node group → server), signs SVIDs, holds the secret. Managed declaratively via two Terraform providers: [`cyberark/swa`](https://registry.terraform.io/providers/cyberark/swa/latest) (bundled, SPIFFE platform layer) and [`cyberark/conjur`](https://registry.terraform.io/providers/cyberark/conjur/latest) (public registry, Conjur policy / authenticator / secret).
 2. **SWA Server (in-cluster Deployment).** Authenticates to the control plane via projected SA token. Listens on `:8443` (gRPC for agents) and `:8080` (web). Holds the cluster's PSAT trust anchor.
 3. **SWA Agent (in-cluster DaemonSet).** Per-node. Mints SVIDs for workloads. Exposes a SPIFFE Workload API socket at `/tmp/swa-agent/public/api.sock` via `hostPath` so co-located workload pods can fetch SVIDs without RPCs leaving the node.
 
 Demo apps in `apps/`:
 
-- **`carrier`** (Go) — the workload that actually consumes a secret. Single binary, distroless image, ~150 lines of business logic. Uses [`go-spiffe/v2`](https://github.com/spiffe/go-spiffe) for SVID handling.
-- **`portal`** (Go + vanilla HTML/CSS/JS) — the browser-facing surface. Opens mTLS to carrier, multiplexes its own trace events with the carrier's trace SSE into one stream for the inspector pane. Vanilla front end on purpose — no React, no Tailwind, no shadcn (see [Brand and visual constraints](#brand-and-visual-constraints)).
+- **`carrier`** (Go). The workload that actually consumes a secret. Single binary, distroless image, ~150 lines of business logic. Uses [`go-spiffe/v2`](https://github.com/spiffe/go-spiffe) for SVID handling.
+- **`portal`** (Go + vanilla HTML/CSS/JS). The browser-facing surface. Opens mTLS to carrier, multiplexes its own trace events with the carrier's trace SSE into one stream for the inspector pane. Vanilla front end on purpose: no React, no Tailwind, no shadcn.
 
 ---
 
 ## Found a bug? Want to learn the concepts?
 
 - **Bug or feature request for this demo:** open an issue on this repo.
-- **Want to understand SPIFFE, SVIDs, attestation, trust domains, or workload identity in general?** **[thesecretlivesofidentity.com](https://thesecretlivesofidentity.com)** is the best starting point — interactive visualizations that build intuition far faster than reading specs.
+- **Want to understand SPIFFE, SVIDs, attestation, trust domains, or workload identity in general?** **[thesecretlivesofidentity.com](https://thesecretlivesofidentity.com)** is the best starting point. Interactive visualizations that build intuition far faster than reading specs.
 - **CyberArk Secure Workload Access product docs (GA):** [docs.cyberark.com/secrets-manager-saas/.../ccl-getstarted-swa-lp.htm](https://docs.cyberark.com/secrets-manager-saas/latest/en/content/conjurcloud/ccl-getstarted-swa-lp.htm).
 
 ---
 
 ## Security and license
 
-**Secrets handling.** No secret material is committed to this repo, and `make doctor` enforces that posture (any `.envrc` containing CLIENT_ID/SECRET would be flagged). Service User credentials live in the macOS Keychain via [Conceal](https://github.com/cyberark/conceal); every tenant-touching command is wrapped in [`summon -p conceal_summon`](https://github.com/cyberark/summon), which injects them as env vars for that subprocess only — never on disk in cleartext, never visible to `ps`. The SM operator token has an ~8 min TTL and is re-minted per Make target invocation rather than cached.
+**Secrets handling.** No secret material is committed to this repo, and `make doctor` enforces that posture (any `.envrc` containing CLIENT_ID/SECRET would be flagged). Service User credentials live in the macOS Keychain via [Conceal](https://github.com/cyberark/conceal); every tenant-touching command is wrapped in [`summon -p conceal_summon`](https://github.com/cyberark/summon), which injects them as env vars for that subprocess only. Never on disk in cleartext, never visible to `ps`. The SM operator token has an ~8 min TTL and is re-minted per Make target invocation rather than cached.
 
-**In-cluster trust.** mTLS authorizers between the portal and carrier services use explicit [`tlsconfig.AuthorizeID(peerSPIFFE)`](https://pkg.go.dev/github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig#AuthorizeID) — never `AuthorizeAny` or `AuthorizeMemberOf`. The Conjur policy scopes the carrier's SPIFFE ID to read+execute on exactly one variable (`swa-demo/carrier/api-key`), not a glob or pattern. The only cluster-wide RBAC permission granted is `TokenReview`, required by the `k8s_psat` node attestor.
+**In-cluster trust.** mTLS authorizers between the portal and carrier services use explicit [`tlsconfig.AuthorizeID(peerSPIFFE)`](https://pkg.go.dev/github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig#AuthorizeID), never `AuthorizeAny` or `AuthorizeMemberOf`. The Conjur policy scopes the carrier's SPIFFE ID to read+execute on exactly one variable (`swa-demo/carrier/api-key`), not a glob or pattern. The only cluster-wide RBAC permission granted is `TokenReview`, required by the `k8s_psat` node attestor.
 
 **Vulnerability reporting.** This is a demo, not a production deployment. If you spot a security issue please open a GitHub issue (or contact the maintainer directly for anything you'd rather not file publicly).
 
