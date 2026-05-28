@@ -130,28 +130,20 @@ Demo apps in `apps/`:
 
 ---
 
-## Methodology
-
-This repo was built by **Claude Code agent teams** ([code.claude.com/docs/en/agent-teams](https://code.claude.com/docs/en/agent-teams)) using a **builder–validator pair per milestone**: one teammate executes the milestone's plan task-by-task, another grades the diff against a 10-criterion rubric and gates advancement at ≥9/10. Three milestones → three sequential pairs, fresh context each time, all coordinated through agent-teams' shared task list + direct messaging. See the [git tag annotations](https://github.com/infamousjoeg/idira-swa-demo/tags) (`m1-validated`, `m2-validated`, `m3-validated`) for the validator's per-milestone grade summary and findings.
-
-The full spec + per-milestone implementation plans + validator reports live in `docs/superpowers/` locally; they're gitignored from this public repo for size reasons but happily shareable on request.
-
----
-
-## Brand and visual constraints
-
-The UI is hand-built vanilla HTML/CSS/JS — no React, no Tailwind, no shadcn — to hold the Palo Alto Networks brand line and avoid the generic "AI-generated SaaS dashboard" look. The Playwright smoke test (`ui-tests/smoke.spec.ts`) includes automated assertions that reject emoji, purple/pink gradients, and shadcn class markers anywhere in the rendered DOM. Visual style follows the official PANW brand guide: Helvetica Neue body, TT Hoves headlines (with system fallback), Idira Blue (`#265BFF`) as the primary accent, PANW Orange reserved for alerts only, square-cornered CTAs in ALL CAPS, line-only iconography, sentence-case headlines.
-
----
-
 ## Found a bug? Want to learn the concepts?
 
 - **Bug or feature request for this demo:** open an issue on this repo.
 - **Want to understand SPIFFE, SVIDs, attestation, trust domains, or workload identity in general?** **[thesecretlivesofidentity.com](https://thesecretlivesofidentity.com)** is the best starting point — interactive visualizations that build intuition far faster than reading specs.
-- **Curious about CyberArk Idira / Secure Workload Access specifically?** The official docs are at [docs.cyberark.com/early-release/swa](https://docs.cyberark.com/early-release/swa).
+- **CyberArk Secure Workload Access product docs (GA):** [docs.cyberark.com/secrets-manager-saas/.../ccl-getstarted-swa-lp.htm](https://docs.cyberark.com/secrets-manager-saas/latest/en/content/conjurcloud/ccl-getstarted-swa-lp.htm).
 
 ---
 
-## License
+## Security and license
 
-[Apache 2.0](LICENSE). See [NOTICE](NOTICE) for third-party attribution.
+**Secrets handling.** No secret material is committed to this repo, and `make doctor` enforces that posture (any `.envrc` containing CLIENT_ID/SECRET would be flagged). Service User credentials live in the macOS Keychain via [Conceal](https://github.com/cyberark/conceal); every tenant-touching command is wrapped in [`summon -p conceal_summon`](https://github.com/cyberark/summon), which injects them as env vars for that subprocess only — never on disk in cleartext, never visible to `ps`. The SM operator token has an ~8 min TTL and is re-minted per Make target invocation rather than cached.
+
+**In-cluster trust.** mTLS authorizers between the portal and carrier services use explicit [`tlsconfig.AuthorizeID(peerSPIFFE)`](https://pkg.go.dev/github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig#AuthorizeID) — never `AuthorizeAny` or `AuthorizeMemberOf`. The Conjur policy scopes the carrier's SPIFFE ID to read+execute on exactly one variable (`swa-demo/carrier/api-key`), not a glob or pattern. The only cluster-wide RBAC permission granted is `TokenReview`, required by the `k8s_psat` node attestor.
+
+**Vulnerability reporting.** This is a demo, not a production deployment. If you spot a security issue please open a GitHub issue (or contact the maintainer directly for anything you'd rather not file publicly).
+
+**License.** [Apache 2.0](LICENSE). Third-party component attribution in [NOTICE](NOTICE).
