@@ -130,7 +130,26 @@ down: _check-env ## Tear down everything (cluster + tenant TF state). Best-effor
 	@# makes the refresh fail and the destroy stops with state intact.
 	@# `-refresh=false` is a belt-and-suspenders defense in case someone
 	@# nukes the cluster out-of-band before running `make down`.
-	-$(SUMMON) -- bash -c 'set -euo pipefail; tok=$$(./scripts/get-sm-token.sh); CONJUR_APPLIANCE_URL=$(PANW_SM_URL) CONJUR_AUTHN_TOKEN=$$tok $(TF) destroy -auto-approve -refresh=false -var sm_url=$(PANW_SM_URL)'
+	@#
+	@# M2 carryover fix (2026-05-27): a single-shot destroy stranded 8 TF
+	@# resources because the SM auth token expired mid-destroy (SM tokens
+	@# are ~8min and a full destroy can outrun that on a slow tenant). The
+	@# tenant also intermittently returns 409 "Concurrent policy load" when
+	@# unrelated resources are being torn down in the same batch. Both
+	@# failure modes are transient — re-running `make down` cleans them up.
+	@# Bake that retry into the recipe: up to 3 attempts, each gets a fresh
+	@# token, and we stop as soon as `terraform state list` is empty.
+	-@$(SUMMON) -- bash -c '\
+	  set -uo pipefail; \
+	  for attempt in 1 2 3; do \
+	    echo "==> tf destroy attempt $$attempt/3"; \
+	    tok=$$(./scripts/get-sm-token.sh); \
+	    CONJUR_APPLIANCE_URL=$(PANW_SM_URL) CONJUR_AUTHN_TOKEN=$$tok \
+	      $(TF) destroy -auto-approve -refresh=false -var sm_url=$(PANW_SM_URL) || true; \
+	    remaining=$$($(TF) state list 2>/dev/null | wc -l | tr -d " "); \
+	    echo "==> tf state remaining: $$remaining"; \
+	    if [ "$$remaining" = "0" ]; then break; fi; \
+	  done'
 	-kubectl delete ns swa-demo swa-system --wait=false 2>/dev/null
 	-kind delete cluster --name $(KIND_CLUSTER)
 
