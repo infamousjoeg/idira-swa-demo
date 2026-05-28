@@ -148,7 +148,9 @@ tf-apply-app: _check-env tf-init ## Apply TF subset #2: jwt authn + policy + sec
 
 build-apps: ## Build the demo app images locally and load into kind
 	docker build -t idira/carrier:m2 apps/carrier/
+	docker build -t idira/portal:m3  apps/portal/
 	kind load docker-image idira/carrier:m2 --name $(KIND_CLUSTER)
+	kind load docker-image idira/portal:m3  --name $(KIND_CLUSTER)
 
 deploy-apps: ## Deploy the demo app manifests into swa-demo
 	kubectl apply -f platform/k8s/namespace.yaml
