@@ -60,23 +60,23 @@ check_path 'swa-release-1.0.4/helm/swa-agent-0.1.0.tgz'                 'agent c
 check_path 'swa-release-1.0.4/install-terraform-provider.sh'            'provider installer'
 
 echo
-echo 'Non-secret env (from .envrc):'
-if [[ -f .envrc ]]; then
-  set +u
-  # shellcheck disable=SC1091
-  source .envrc
-  set -u
-  for v in PANW_SM_TENANT CONCEAL_NAMESPACE; do
-    if [[ -z "${!v:-}" ]]; then
-      printf '  [MISSING] $%s — see .envrc.example\n' "$v"; fail=$((fail+1))
+echo 'Non-secret env:'
+# Inspect the *inherited* env only. Self-sourcing .envrc would mask the
+# real problem: if the caller's shell hasn't loaded it (via direnv or
+# `source .envrc`), the Makefile won't see the vars either, and `make up`
+# would fail at the first `_check-env` recipe with a confusing message.
+for v in PANW_SM_TENANT CONCEAL_NAMESPACE; do
+  if [[ -z "${!v:-}" ]]; then
+    if [[ -f .envrc ]]; then
+      printf '  [MISSING] $%s — .envrc exists but is not loaded into this shell; run `direnv allow` or `source .envrc`\n' "$v"
     else
-      printf '  [ok]      $%s=%s\n' "$v" "${!v}"
+      printf '  [MISSING] $%s — copy .envrc.example to .envrc, fill in values, then `direnv allow` or `source .envrc`\n' "$v"
     fi
-  done
-else
-  printf '  [MISSING] .envrc — copy .envrc.example and fill in PANW_SM_TENANT + CONCEAL_NAMESPACE\n'
-  fail=$((fail+1))
-fi
+    fail=$((fail+1))
+  else
+    printf '  [ok]      $%s=%s\n' "$v" "${!v}"
+  fi
+done
 
 echo
 echo 'Secrets (macOS Keychain via Conceal):'

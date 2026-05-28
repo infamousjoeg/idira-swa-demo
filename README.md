@@ -54,6 +54,7 @@ What's *not* present anywhere: a hardcoded `API_KEY=…` env var, a mounted secr
 
 - macOS Apple Silicon (the bundled SWA container images are `arm64v8`-only for this demo).
 - On PATH: `docker`, `kind`, `kubectl`, `helm`, `terraform`, `jq`, `curl`, `envsubst`, `summon`, `conceal`.
+- A way to load `.envrc` into your shell. [`direnv`](https://direnv.net/) is recommended (`brew install direnv` plus `eval "$(direnv hook zsh)"` in your shell rc, then `direnv allow` in this directory). Without it you must `source .envrc` manually in every new shell before running `make` -- `make doctor` will fail loudly if the env isn't loaded.
 - `node` ≥ 18 (for the headless Playwright smoke test).
 - A `swa-release-1.0.4/` bundle in this directory (gitignored vendor drop from CyberArk, not in this repo).
 - A CyberArk Secrets Manager – SaaS tenant with a Service User you can authenticate as. Copy `.envrc.example` to `.envrc` and set `PANW_SM_TENANT` (your SM SaaS subdomain) and `CONCEAL_NAMESPACE` (the Keychain path where you've stored the Service User credentials).
@@ -69,12 +70,12 @@ What's *not* present anywhere: a hardcoded `API_KEY=…` env var, a mounted secr
 ```bash
 cp .envrc.example .envrc
 $EDITOR .envrc                                    # set PANW_SM_TENANT + CONCEAL_NAMESPACE
+direnv allow                                       # or `source .envrc` -- $CONCEAL_NAMESPACE must be exported before the next two commands
 
 # Store your Service User creds in the macOS Keychain (one-time):
 conceal set "$CONCEAL_NAMESPACE/client_id"     <your-service-user-login>
 conceal set "$CONCEAL_NAMESPACE/client_secret" <your-service-user-api-key>
 
-direnv allow                                       # or `source .envrc`
 make doctor                                        # verify prerequisites
 make up                                            # full deploy + headless smoke (~4 min)
 make portforward                                   # serve portal on http://localhost:8080
