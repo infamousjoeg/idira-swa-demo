@@ -5,7 +5,13 @@ set -euo pipefail
 pf_log=$(mktemp)
 kubectl -n swa-demo port-forward svc/portal 8080:8080 >"$pf_log" 2>&1 &
 pf_pid=$!
-trap 'kill $pf_pid 2>/dev/null || true; rm -f $pf_log; true' EXIT
+disown $pf_pid
+cleanup() {
+  kill "$pf_pid" 2>/dev/null || true
+  wait "$pf_pid" 2>/dev/null || true
+  rm -f "$pf_log"
+}
+trap cleanup EXIT
 
 # Wait for the port-forward to be ready.
 for i in {1..30}; do
