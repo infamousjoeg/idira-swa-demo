@@ -58,7 +58,7 @@ What's *not* present anywhere: a hardcoded `API_KEY=…` env var, a mounted secr
 - A `swa-release-1.0.4/` bundle in this directory (gitignored vendor drop from CyberArk, not in this repo).
 - A CyberArk Secrets Manager – SaaS tenant with a Service User you can authenticate as. Copy `.envrc.example` to `.envrc` and set `PANW_SM_TENANT` (your SM SaaS subdomain) and `CONCEAL_NAMESPACE` (the Keychain path where you've stored the Service User credentials).
 
-**No secrets in `.envrc`.** Service User credentials live in the macOS Keychain via [Conceal](https://github.com/cyberark/conceal), under `${CONCEAL_NAMESPACE}/client_id` and `${CONCEAL_NAMESPACE}/client_secret`. Every tenant-touching command is wrapped in [`summon -p conceal_summon`](https://github.com/cyberark/summon), which injects them as env vars for that subprocess only. They're never on disk in cleartext and never visible to `ps`.
+**No secrets in `.envrc`.** Service User credentials live in the macOS Keychain via [Conceal](https://github.com/infamousjoeg/conceal), under `${CONCEAL_NAMESPACE}/client_id` and `${CONCEAL_NAMESPACE}/client_secret`. Every tenant-touching command is wrapped in [`summon -p conceal_summon`](https://cyberark.github.io/summon), which injects them as env vars for that subprocess only. They're never on disk in cleartext and never visible to `ps`.
 
 `make doctor` enforces all the above (tools, host, env vars, Conceal-stored credentials, tenant reachability) and exits non-zero with a concrete diagnostic if anything's missing.
 
