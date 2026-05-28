@@ -18,7 +18,9 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8443
-              name: http
+              name: https
+            - containerPort: 8444
+              name: trace
           env:
             - name: PANW_SM_URL
               valueFrom:
@@ -28,12 +30,22 @@ spec:
                 configMapKeyRef: {name: carrier-config, key: secret_id}
             - name: SPIFFE_ENDPOINT_SOCKET
               value: unix:///run/swa-agent/api.sock
+            # M3: only this exact SPIFFE ID is accepted on mTLS — spec §13.4 #4.
+            - name: PORTAL_SPIFFE_ID
+              value: spiffe://idira.demo/kind-ng/ns/swa-demo/sa/portal
           volumeMounts:
             - name: swa-agent-socket
               mountPath: /run/swa-agent
               readOnly: true
           readinessProbe:
-            httpGet: {path: /healthz, port: http}
+            # mTLS gates :8443 but a HTTPS probe with httpGet.scheme=HTTPS
+            # completes the TLS handshake without sending a client cert —
+            # kubelet validates the server cert against the cluster CA bundle.
+            # That's not what we want (kubelet has no SPIFFE cert), so use a
+            # TCP probe instead: success means the listener is up + TLS is
+            # accepting. The /healthz path is unreachable post-mTLS upgrade
+            # without a client cert anyway.
+            tcpSocket: {port: https}
             initialDelaySeconds: 2
             periodSeconds: 5
       volumes:

@@ -152,8 +152,9 @@ build-apps: ## Build the demo app images locally and load into kind
 	kind load docker-image idira/carrier:m2 --name $(KIND_CLUSTER)
 	kind load docker-image idira/portal:m3  --name $(KIND_CLUSTER)
 
-deploy-apps: ## Deploy the demo app manifests into swa-demo
+deploy-apps: ## Deploy carrier + portal into swa-demo
 	kubectl apply -f platform/k8s/namespace.yaml
+	kubectl apply -f platform/k8s/portal.sa.yaml
 	@# carrier-config holds the SM URL + variable path the carrier reads.
 	@# variable path is the Conjur resource id verbatim — `data/<branch>/<name>`
 	@# (verified empirically 2026-05-27: omitting the `data/` prefix returns
@@ -166,18 +167,17 @@ deploy-apps: ## Deploy the demo app manifests into swa-demo
 	  --from-literal=sm_url=$(PANW_SM_URL) \
 	  --from-literal=secret_id=data/swa-demo/carrier/api-key \
 	  --dry-run=client -o yaml | kubectl apply -f -
+	@# M3: retire the M2 portal-stub atomically before bringing up the real
+	@# portal. The stub was a plain curl pod under the same `portal` SA — it
+	@# can no longer reach the (now mTLS-only) carrier, and the real portal
+	@# Deployment is what smoke-m2 / smoke-m3 talk to from M3 onward.
+	-kubectl -n swa-demo delete pod portal-stub --ignore-not-found
 	kubectl apply -f platform/k8s/carrier.deployment.yaml
 	kubectl apply -f platform/k8s/carrier.service.yaml
-	@# Preload curlimages/curl into kind. Same HTTP_PROXY pull failure that
-	@# bit busybox in `make images` (M1) hits the curl image too — the kind
-	@# kubelet inherits Docker Desktop's proxy at 127.0.0.1:8080 which is
-	@# unreachable from inside the node. Pulling locally + `kind load`
-	@# bypasses the kubelet pull entirely.
-	@docker image inspect curlimages/curl:8.10.1 >/dev/null 2>&1 || docker pull curlimages/curl:8.10.1
-	kind load docker-image curlimages/curl:8.10.1 --name $(KIND_CLUSTER)
-	kubectl apply -f platform/k8s/portal-stub.yaml
+	kubectl apply -f platform/k8s/portal.deployment.yaml
+	kubectl apply -f platform/k8s/portal.service.yaml
 	kubectl -n swa-demo rollout status deploy/carrier --timeout=2m
-	kubectl -n swa-demo wait --for=condition=Ready pod/portal-stub --timeout=60s
+	kubectl -n swa-demo rollout status deploy/portal  --timeout=2m
 
 smoke-m2: ## Run M2 acceptance check
 	@./scripts/smoke-m2.sh

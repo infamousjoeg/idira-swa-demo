@@ -1,0 +1,11 @@
+# ServiceAccount for the portal Deployment. Extracted from the retired M2
+# portal-stub manifest so SPIFFE identity continuity is preserved across the
+# stub→real-portal swap: same SA name `portal` in `swa-demo`, so the
+# workload_id_template renders the same
+# spiffe://idira.demo/kind-ng/ns/swa-demo/sa/portal that carrier's mTLS
+# AuthorizeID expects.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: portal
+  namespace: swa-demo

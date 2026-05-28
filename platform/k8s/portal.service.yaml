@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: portal
+  namespace: swa-demo
+spec:
+  selector: {app: portal}
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http

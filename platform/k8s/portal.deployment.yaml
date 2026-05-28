@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: portal
+  namespace: swa-demo
+  labels: {app: portal}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: portal}}
+  template:
+    metadata:
+      labels: {app: portal}
+    spec:
+      # ServiceAccount `portal` is declared in platform/k8s/portal.sa.yaml
+      # (extracted from the retired M2 portal-stub manifest). SPIFFE ID
+      # spiffe://idira.demo/kind-ng/ns/swa-demo/sa/portal — the carrier's
+      # mTLS AuthorizeID matches this exactly.
+      serviceAccountName: portal
+      containers:
+        - name: portal
+          image: idira/portal:m3
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: CARRIER_HOST
+              value: carrier.swa-demo.svc.cluster.local
+            - name: CARRIER_SPIFFE_ID
+              value: spiffe://idira.demo/kind-ng/ns/swa-demo/sa/carrier
+            - name: SPIFFE_ENDPOINT_SOCKET
+              value: unix:///run/swa-agent/api.sock
+          volumeMounts:
+            - name: swa-agent-socket
+              mountPath: /run/swa-agent
+              readOnly: true
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 2
+            periodSeconds: 5
+      volumes:
+        - name: swa-agent-socket
+          hostPath:
+            path: /tmp/swa-agent/public
+            type: Directory
