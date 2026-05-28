@@ -204,7 +204,7 @@ smoke-m2: ## Run M2 acceptance check
 up-m2: up-m1 build-apps deploy-apps tf-apply-app smoke-m2 ## Full M2 deploy + smoketest
 	@echo 'M2 ready.'
 
-.PHONY: portforward smoke-m3
+.PHONY: portforward smoke-m3 up smoke
 
 portforward: ## Forward portal :8080 to localhost (blocks)
 	@echo 'Portal at http://localhost:8080 — Ctrl+C to stop'
@@ -212,3 +212,16 @@ portforward: ## Forward portal :8080 to localhost (blocks)
 
 smoke-m3: ## Run M3 acceptance check (headless browser)
 	@./scripts/smoke-ui.sh
+
+# up — full demo from clean slate. The dependency chain runs each step
+# in order (M1 platform → app images → app deploy → app TF → M3 smoke).
+# Uses smoke-m3 at the end because the M3 headless smoke exercises the
+# full M1+M2+M3 stack — running smoke-m1/m2 separately would just be
+# redundant during a clean `make up`.
+up: up-m1 build-apps deploy-apps tf-apply-app smoke-m3 ## Full demo deploy + smoketest
+	@echo
+	@echo 'Demo ready. Run: make portforward'
+
+# smoke — runs all three milestone smoketests in order. Use this to spot
+# which milestone broke if `make up` ever surprises you.
+smoke: smoke-m1 smoke-m2 smoke-m3 ## Run all milestone smoketests
