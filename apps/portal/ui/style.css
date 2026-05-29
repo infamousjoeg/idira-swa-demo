@@ -282,3 +282,15 @@ body {
   color: #FFFFFF;
   border-bottom: 1px solid var(--idira-500);
 }
+
+/* === M5 contrast lift: label-mute readability on the dark inspector pane === */
+/* --text-mute (#4A4A52) on --bg-inspector (#0B0D14) is ~2.4:1 (fails WCAG AA). */
+/* Scoped to .diagram so .pace-control__opt inactive (which uses --text-mute on */
+/* a different background) is unaffected. */
+.diagram .label-mute { fill: #8B8E9E; }
+
+/* === M5 contrast lift: JWT hero panel labels === */
+/* When #jwt-rect goes .stage-rect--hero, its fill is --idira-500 (#265BFF). */
+/* label-idira (#6186FC) on that drops to ~1.8:1. :has() activates only while */
+/* the rect is in hero state, so the resting state on the dark pane is intact. */
+.diagram g:has(.stage-rect--hero) .label-idira { fill: #DCE5FF; }
