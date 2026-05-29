@@ -2,7 +2,7 @@
 
 A Mac-laptop demo of **Palo Alto Networks' Idira Secure Workload Access (SWA)**: a real workload fetches a real secret from CyberArk Secrets Manager – SaaS without ever holding a static credential. The UI splits left/right so you can *watch* the identity exchange happen on every click.
 
-![Portal split view. Left pane shows the Praetor Logistics shipment lookup form; right pane shows the Idira inspector with live trace events](docs/img/portal-resolved.png)
+![Portal split view. Left pane shows the Praetor Logistics shipment lookup form with a plain-English trust evidence card; right pane shows the live SPIFFE trust diagram walking through the resolve sequence](docs/img/portal-resolved.png)
 
 ---
 
@@ -29,12 +29,14 @@ That's all you need. If you want to go deeper into what attestation actually is,
 
 Open `http://localhost:8080` after `make up && make portforward`:
 
-![Portal idle state, split view ready for a shipment ID](docs/img/portal-empty.png)
+![Portal idle state, split view ready for a shipment ID with the hierarchy ribbon populated and an idle diagram](docs/img/portal-empty.png)
 
 - **Left pane.** *Praetor Logistics* shipment-lookup portal. A plausible-looking internal app that looks up a shipment by ID. Type a shipment ID (e.g. `SHP-2049-883`), click **RESOLVE SECRET**.
-- **Right pane.** *Idira inspector.* A live trace of every identity hop the request triggers. Each event is a real thing happening: the portal opening an mTLS connection to the carrier, the carrier asking the local agent for a JWT-SVID, the carrier exchanging that JWT at Secrets Manager for an access token, the secret being fetched, the shipment being looked up.
+- **Right pane.** *Live SPIFFE trust diagram.* A schematic that paints itself in real time as a resolve flows through. Top is the trust hierarchy (trust domain, server group with attestor, node group), middle is the portal-carrier mTLS edge with each side's full X.509-SVID, bottom is the JWT-SVID hero panel followed by the Secrets Manager SaaS exchange and the secret return. Each stage of the diagram corresponds to a real event in the wire trace.
 
-End-to-end click → result → fully-populated inspector takes ~200 ms. Nothing is mocked except the carrier's downstream "did you find the shipment" call, which returns canned JSON from a fixture file.
+The backend resolve completes in well under 200 ms. By default the diagram paces itself over about 2.25 seconds so a human can see each stage light up in sequence; the pace toggle in the inspector header (off / fast / medium / slow) lets a presenter speed it up or slow it down mid-demo, and `?pace=off` in the URL gives engineers the raw real-time behavior. Nothing is mocked except the carrier's downstream "did you find the shipment" call, which returns canned JSON from a fixture file.
+
+![Portal mid-walk: SKIP button visible, mTLS edge solid, carrier card lit, JWT hero panel about to reveal](docs/img/portal-walking.png)
 
 ### The flow, step by step
 
@@ -79,7 +81,7 @@ conceal set "$CONCEAL_NAMESPACE/client_secret" <your-service-user-api-key>
 make doctor                                        # verify prerequisites
 make up                                            # full deploy + headless smoke (~4 min)
 make portforward                                   # serve portal on http://localhost:8080
-# ... click around, watch the inspector, demo away ...
+# ... click around, watch the diagram walk, demo away ...
 make down                                          # tear everything down (cluster + tenant state)
 ```
 
@@ -127,7 +129,7 @@ Three layers:
 Demo apps in `apps/`:
 
 - **`carrier`** (Go). The workload that actually consumes a secret. Single binary, distroless image, ~150 lines of business logic. Uses [`go-spiffe/v2`](https://github.com/spiffe/go-spiffe) for SVID handling.
-- **`portal`** (Go + vanilla HTML/CSS/JS). The browser-facing surface. Opens mTLS to carrier, multiplexes its own trace events with the carrier's trace SSE into one stream for the inspector pane. Vanilla front end on purpose: no React, no Tailwind, no shadcn.
+- **`portal`** (Go + vanilla HTML/CSS/JS). The browser-facing surface. Opens mTLS to carrier, multiplexes its own trace events with the carrier's trace SSE into one stream that drives the live trust diagram. Serves `GET /identity` so the diagram can render the SPIFFE hierarchy and both workload SVIDs. Vanilla front end on purpose: no React, no Tailwind, no shadcn.
 
 ---
 
