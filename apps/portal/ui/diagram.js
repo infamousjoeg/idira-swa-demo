@@ -241,7 +241,7 @@ const DISPATCH = {
   },
   'mtls.handshake.ok': (ev) => {
     setRectState('carrier-rect', 'lit');
-    setText('mtls-label', 'mTLS ✓');
+    setText('mtls-label', 'mTLS OK');
     setText('mtls-cipher', shortCipher(ev.payload?.cipher) || '');
   },
   'jwt_svid.issued': (ev) => {
@@ -264,15 +264,15 @@ const DISPATCH = {
   },
   'sm.authn_jwt.ok': () => {
     setRectState('sm-rect', 'lit');
-    setText('sm-header', 'SECRETS MANAGER · SAAS  ·  TOKEN GRANTED ✓');
+    setText('sm-header', 'SECRETS MANAGER · SAAS  ·  TOKEN GRANTED');
     setText('sm-body', `scoped to ${currentSecretID()} · policy denies all others`);
-    setText('jwt-header', 'CARRIER · JWT-SVID  ·  ACCEPTED ✓');
+    setText('jwt-header', 'CARRIER · JWT-SVID  ·  ACCEPTED');
     setConnState('to-sm', 'lit');
     setConnState('to-secret', 'lit');
   },
   'sm.secret_fetched.ok': (ev) => {
     setRectState('secret-rect', 'lit');
-    setText('secret-header', 'SECRET RETURNED ✓');
+    setText('secret-header', 'SECRET RETURNED');
     const bytes = ev.payload?.bytes ?? 0;
     setText('secret-body', `bytes=${bytes} · in-process · held for one request · never on disk`);
   },

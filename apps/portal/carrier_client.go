@@ -89,9 +89,14 @@ func (c *CarrierClient) Lookup(ctx context.Context, shipmentID string) ([]byte, 
 // Identity fetches the carrier's /identity over the existing mTLS client.
 // Used by the portal /identity aggregator. Caching is the caller's concern.
 func (c *CarrierClient) Identity(ctx context.Context) (*identityResp, error) {
-	host := hostFromURL(c.baseURL)
-	url := fmt.Sprintf("https://%s:8444/identity", host)
-	return c.identityFromURL(ctx, url)
+	// hostFromURL returns "host:port" — use Hostname() to drop the :8443
+	// before re-suffixing with the trace/identity port :8444.
+	parsed, err := url.Parse(c.baseURL)
+	if err != nil {
+		return nil, err
+	}
+	target := fmt.Sprintf("https://%s:8444/identity", parsed.Hostname())
+	return c.identityFromURL(ctx, target)
 }
 
 // identityFromURL is exposed for tests that need to point at a custom URL.
