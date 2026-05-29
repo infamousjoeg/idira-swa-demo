@@ -23,6 +23,9 @@ async function loadIdentity() {
     console.error('diagram: /identity failed:', err);
     paintIdentityUnavailable();
   }
+  // Branch connectors below the hierarchy ribbon are always "lit" — they
+  // represent static infrastructure relationships, not in-flight requests.
+  ['branch-stem', 'branch-cross', 'branch-l', 'branch-r'].forEach(id => setConnState(id, 'lit'));
 }
 
 function renderSkeleton(host) {
@@ -206,3 +209,170 @@ function setText(id, val) {
 
 // Kick off the load. Errors are handled inside loadIdentity().
 loadIdentity();
+
+// === SSE consumer: drive state transitions ===
+
+const es = new EventSource('/trace');
+es.onmessage = (ev) => {
+  let parsed;
+  try { parsed = JSON.parse(ev.data); } catch { return; }
+  // Carrier events arrive wrapped — unwrap.
+  if (parsed.type === 'carrier.event.raw' && parsed.payload?.frame) {
+    try { parsed = JSON.parse(parsed.payload.frame); } catch {}
+  }
+  dispatch(parsed);
+};
+
+function dispatch(ev) {
+  const handler = DISPATCH[ev.type];
+  if (handler) handler(ev);
+  if (/\.err$/.test(ev.type)) handleError(ev);
+}
+
+const DISPATCH = {
+  'portal.resolve.requested': () => {
+    resetForReplay();
+    setRectState('portal-rect', 'lit');
+    setHintHidden(true);
+  },
+  'mtls.handshake.start': () => {
+    setConnState('mtls-line', 'lit');
+    setText('mtls-label', 'mTLS');
+  },
+  'mtls.handshake.ok': (ev) => {
+    setRectState('carrier-rect', 'lit');
+    setText('mtls-label', 'mTLS ✓');
+    setText('mtls-cipher', shortCipher(ev.payload?.cipher) || '');
+  },
+  'jwt_svid.issued': (ev) => {
+    setRectState('jwt-rect', 'hero');
+    document.getElementById('jwt-placeholder').style.display = 'none';
+    document.getElementById('jwt-fields').style.display = '';
+    setText('jwt-sub', ev.payload?.spiffe_id || '');
+    setText('jwt-aud', ev.payload?.aud || '');
+    setText('jwt-alg', ev.payload?.alg || '');
+    setText('jwt-kid', ev.payload?.kid || '');
+    setText('jwt-header', 'CARRIER · JWT-SVID  ·  PRESENTING');
+    setConnState('to-sm', 'pending');
+    setText('to-sm-label', 'POST /api/authn-jwt/… (in flight)');
+    setRectState('sm-rect', 'pending');
+    setText('sm-body', 'validating JWT against tenant JWKS…');
+    // Start TTL ticker now; sm.authn_jwt.ok will flip header to "ACCEPTED".
+    const exp = Number(ev.payload?.exp) || (Math.floor(Date.now() / 1000) + 300);
+    // Issued-at not on payload; approximate iat as now (TTL bar starts at ~100%).
+    setIssuedAndExp(Math.floor(Date.now() / 1000), exp);
+  },
+  'sm.authn_jwt.ok': () => {
+    setRectState('sm-rect', 'lit');
+    setText('sm-header', 'SECRETS MANAGER · SAAS  ·  TOKEN GRANTED ✓');
+    setText('sm-body', `scoped to ${currentSecretID()} · policy denies all others`);
+    setText('jwt-header', 'CARRIER · JWT-SVID  ·  ACCEPTED ✓');
+    setConnState('to-sm', 'lit');
+    setConnState('to-secret', 'lit');
+  },
+  'sm.secret_fetched.ok': (ev) => {
+    setRectState('secret-rect', 'lit');
+    setText('secret-header', 'SECRET RETURNED ✓');
+    const bytes = ev.payload?.bytes ?? 0;
+    setText('secret-body', `bytes=${bytes} · in-process · held for one request · never on disk`);
+  },
+};
+
+function handleError(ev) {
+  // Map error event type to the SVG element id and whether it's a rect or a line.
+  const target = ERROR_MAP[ev.type];
+  if (!target) return;
+  if (target.kind === 'rect') setRectState(target.id, 'err');
+  else                        setConnState(target.id, 'err');
+  // Caption: keep short — payload.err truncated to 90 chars.
+  const caption = String(ev.payload?.err || ev.type).slice(0, 90);
+  appendErrorCaption(target.id, caption);
+}
+
+const ERROR_MAP = {
+  'mtls.handshake.err':       { id: 'mtls-line',    kind: 'line' },
+  'jwt_svid.error':           { id: 'jwt-rect',     kind: 'rect' },
+  'sm.authn_jwt.err':         { id: 'sm-rect',      kind: 'rect' },
+  'sm.secret_fetched.err':    { id: 'secret-rect',  kind: 'rect' },
+  'sm.secret_fetched.empty':  { id: 'secret-rect',  kind: 'rect' },
+};
+
+function setRectState(id, state) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('stage-rect--lit', 'stage-rect--hero', 'stage-rect--pending', 'stage-rect--err');
+  if (state) el.classList.add(`stage-rect--${state}`);
+}
+
+function setConnState(id, state) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('conn--lit', 'conn--pending', 'conn--err');
+  if (state) el.classList.add(`conn--${state}`);
+}
+
+function setHintHidden(hidden) {
+  const el = document.getElementById('hint');
+  if (!el) return;
+  el.classList.toggle('hint--hidden', hidden);
+}
+
+function appendErrorCaption(stageId, text) {
+  // Caption placed below the failing stage. One caption per stage; replace if re-fired.
+  const existing = document.getElementById(`${stageId}-err-caption`);
+  if (existing) existing.remove();
+
+  const target = document.getElementById(stageId);
+  if (!target) return;
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const cap = document.createElementNS(svgNS, 'text');
+  cap.id = `${stageId}-err-caption`;
+  cap.setAttribute('class', 'err-caption');
+  cap.setAttribute('font-size', '9');
+  // Coordinates differ for <rect> (x/y/height) vs <line> (x1/y1/y2).
+  let x, y;
+  if (target.tagName === 'rect') {
+    x = parseFloat(target.getAttribute('x') || '0') + 16;
+    y = parseFloat(target.getAttribute('y') || '0') + parseFloat(target.getAttribute('height') || '0') + 18;
+  } else {
+    // For a horizontal line, anchor below its midpoint.
+    const x1 = parseFloat(target.getAttribute('x1') || '0');
+    const x2 = parseFloat(target.getAttribute('x2') || '0');
+    const y1 = parseFloat(target.getAttribute('y1') || '0');
+    x = (x1 + x2) / 2 - 40;
+    y = y1 + 24;
+  }
+  cap.setAttribute('x', String(x));
+  cap.setAttribute('y', String(y));
+  cap.textContent = text;
+  target.parentNode.appendChild(cap);
+}
+
+function resetForReplay() {
+  // Called on portal.resolve.requested. Returns all stages below the hierarchy ribbon to idle.
+  ['portal-rect', 'carrier-rect', 'jwt-rect', 'sm-rect', 'secret-rect'].forEach(id => setRectState(id, null));
+  ['mtls-line', 'to-jwt', 'to-sm', 'to-secret', 'branch-stem', 'branch-cross', 'branch-l', 'branch-r'].forEach(id => setConnState(id, 'lit'));
+  // Restore branch connectors to lit immediately — they reflect static hierarchy, not flow.
+  setText('mtls-label', 'mTLS');
+  setText('mtls-cipher', '');
+  setText('to-sm-label', '');
+  setText('sm-header', 'SECRETS MANAGER · SAAS');
+  setText('sm-body', 'policy scoped to one variable');
+  setText('secret-header', 'SECRET');
+  setText('secret-body', 'in-process · never on disk');
+  setText('jwt-header', 'CARRIER · JWT-SVID');
+  document.getElementById('jwt-placeholder').style.display = '';
+  document.getElementById('jwt-fields').style.display = 'none';
+  // Remove any prior error captions.
+  document.querySelectorAll('[id$="-err-caption"]').forEach(el => el.remove());
+}
+
+function shortCipher(name) {
+  if (!name) return '';
+  // TLS_AES_128_GCM_SHA256 → keep as-is but cap at 22 chars for visual fit.
+  return name.length > 22 ? name.slice(0, 22) + '…' : name;
+}
+
+function currentSecretID() {
+  return identityCache?.secret_id || 'swa-demo/carrier/api-key';
+}
