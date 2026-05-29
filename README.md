@@ -2,7 +2,7 @@
 
 A Mac-laptop demo of **Palo Alto Networks' Idira Secure Workload Access (SWA)**: a real workload fetches a real secret from CyberArk Secrets Manager – SaaS without ever holding a static credential. The UI splits left/right so you can *watch* the identity exchange happen on every click.
 
-![Portal split view. Left pane shows the Praetor Logistics shipment lookup form with a plain-English trust evidence card; right pane shows the live SPIFFE trust diagram walking through the resolve sequence](docs/img/portal-resolved.png)
+![Portal split view. Left pane shows the Praetor Logistics shipment lookup form with a plain-English trust evidence card; right pane shows the live SPIFFE trust diagram fully walked, with carets visible in the top-right of every lit card marking them as click-to-flip detail targets](docs/img/portal-resolved.png)
 
 ---
 
@@ -29,14 +29,18 @@ That's all you need. If you want to go deeper into what attestation actually is,
 
 Open `http://localhost:8080` after `make up && make portforward`:
 
-![Portal idle state, split view ready for a shipment ID with the hierarchy ribbon populated and an idle diagram](docs/img/portal-empty.png)
+![Portal idle state, split view ready for a shipment ID with the hierarchy ribbon populated and an idle diagram; no stage cards are lit yet so no flip carets are visible](docs/img/portal-empty.png)
 
 - **Left pane.** *Praetor Logistics* shipment-lookup portal. A plausible-looking internal app that looks up a shipment by ID. Type a shipment ID (e.g. `SHP-2049-883`), click **RESOLVE SECRET**.
 - **Right pane.** *Live SPIFFE trust diagram.* A schematic that paints itself in real time as a resolve flows through. Top is the trust hierarchy (trust domain, server group with attestor, node group), middle is the portal-carrier mTLS edge with each side's full X.509-SVID, bottom is the JWT-SVID hero panel followed by the Secrets Manager SaaS exchange and the secret return. Each stage of the diagram corresponds to a real event in the wire trace.
 
+  Click any lit card in the diagram to flip it and see the underlying detail: decoded JWT claims with the JOSE header and raw compact serialization for the JWT-SVID hero; full X.509 metadata (SAN URI, subject, issuer, serial, fingerprint, signature algorithm) for the two SVID cards; the actual SM POST URL and the bearer-token response (redacted at the Go wire layer, never displayed in full) for the Secrets Manager card; and the secret-fetch metadata (URL, byte count, version, scope; never the secret value) for the secret returned card. Clicking another card auto-flips the previous one back; clicking RESOLVE auto-unflips everything for the next walk.
+
+  ![Portal in resolved state with the JWT-SVID card flipped open, showing the decoded payload, JOSE header, and raw compact JWT](docs/img/portal-flipped-jwt.png)
+
 The backend resolve completes in well under 200 ms. By default the diagram paces itself over about 2.25 seconds so a human can see each stage light up in sequence; the pace toggle in the inspector header (off / fast / medium / slow) lets a presenter speed it up or slow it down mid-demo, and `?pace=off` in the URL gives engineers the raw real-time behavior. Nothing is mocked except the carrier's downstream "did you find the shipment" call, which returns canned JSON from a fixture file.
 
-![Portal mid-walk: SKIP button visible, mTLS edge solid, carrier card lit, JWT hero panel about to reveal](docs/img/portal-walking.png)
+![Portal mid-walk: SKIP button visible, mTLS edge solid, carrier card lit, JWT hero panel about to reveal; faint carets in the top-right of lit cards mark them as flip-to-detail targets](docs/img/portal-walking.png)
 
 ### The flow, step by step
 
