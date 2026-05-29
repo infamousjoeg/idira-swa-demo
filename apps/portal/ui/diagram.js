@@ -376,3 +376,16 @@ function shortCipher(name) {
 function currentSecretID() {
   return identityCache?.secret_id || 'swa-demo/carrier/api-key';
 }
+
+// === TTL countdown wiring ===
+// Single subscription drives the JWT hero TTL text + bar in the right pane.
+// The left-pane evidence card subscribes separately (evidence.js).
+
+subscribeTTL(({ remaining, fraction }) => {
+  const text = document.getElementById('jwt-ttl');
+  const bar  = document.getElementById('jwt-ttl-bar');
+  if (text) text.textContent = remaining === 0 ? 'expired' : formatMSS(remaining);
+  if (bar)  bar.setAttribute('width', String(Math.round(438 * fraction)));
+  // Border flips orange when expired.
+  if (remaining === 0) setRectState('jwt-rect', 'err');
+});
