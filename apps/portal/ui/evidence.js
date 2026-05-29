@@ -2,6 +2,7 @@
 // after the first successful resolve; subscribes to the shared TTL ticker.
 
 import { subscribe as subscribeTTL, formatMSS } from './ttl-ticker.js';
+import { subscribe as subscribeTrace } from './pace-queue.js';
 
 const card = document.getElementById('evidence');
 const line1 = card?.querySelector('[data-slot="line1"]');
@@ -24,14 +25,10 @@ function renderCopy() {
   line3.innerHTML = `Policy on the Secrets Manager side <b>denies access</b> to every variable except <span class="mono">${escapeHTML(secretID)}</span>.`;
 }
 
-// Subscribe to SSE for lifecycle events.
-const es = new EventSource('/trace');
-es.onmessage = (ev) => {
-  let parsed;
-  try { parsed = JSON.parse(ev.data); } catch { return; }
-  if (parsed.type === 'carrier.event.raw' && parsed.payload?.frame) {
-    try { parsed = JSON.parse(parsed.payload.frame); } catch {}
-  }
+// Subscribe through pace-queue (which owns the only EventSource and unwraps
+// carrier.event.raw frames). Evidence stays in lockstep with diagram.js
+// because both subscribe to the same queue and see the same fanout order.
+subscribeTrace((parsed) => {
   if (parsed.type === 'sm.secret_fetched.ok') {
     renderCopy();
     if (card) card.hidden = false;
@@ -41,7 +38,7 @@ es.onmessage = (ev) => {
     // New resolve started; dim the card until next jwt_svid.issued.
     card.classList.add('evidence--dim');
   }
-};
+});
 
 // Live TTL — single shared ticker.
 subscribeTTL(({ remaining }) => {
