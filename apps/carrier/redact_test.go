@@ -19,15 +19,15 @@ func TestRedactBearer_Short(t *testing.T) {
 
 // TestRedactBearer_Long asserts the display form preserves the first 4
 // chars (enough to disambiguate runs in a log without revealing the secret)
-// followed by the …REDACTED marker, and that nothing from the rest of the
+// followed by the ...REDACTED marker, and that nothing from the rest of the
 // token leaks through.
 func TestRedactBearer_Long(t *testing.T) {
 	got := redactBearer("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.fakesig")
 	if !strings.HasPrefix(got, "eyJh") {
 		t.Errorf("expected first 4 chars preserved, got %q", got)
 	}
-	if !strings.HasSuffix(got, "…REDACTED") {
-		t.Errorf("expected …REDACTED suffix, got %q", got)
+	if !strings.HasSuffix(got, "...REDACTED") {
+		t.Errorf("expected ...REDACTED suffix, got %q", got)
 	}
 	if strings.Contains(got, "fakesig") {
 		t.Errorf("redacted token must not contain anything past the 4-char prefix, got %q", got)

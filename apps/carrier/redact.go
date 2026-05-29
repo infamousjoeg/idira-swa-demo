@@ -1,7 +1,7 @@
 package main
 
 // redactBearer returns a safe display form of a bearer token: first 4
-// characters followed by "…REDACTED". Used at the trace-emission layer
+// characters followed by "...REDACTED". Used at the trace-emission layer
 // in handler.go so the full token never reaches the frontend. Tokens
 // under 4 characters are returned as-is (they're not real tokens).
 //
@@ -12,5 +12,5 @@ func redactBearer(token string) string {
 	if len(token) < 4 {
 		return token
 	}
-	return token[:4] + "…REDACTED"
+	return token[:4] + "...REDACTED"
 }

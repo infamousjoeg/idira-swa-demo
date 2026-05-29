@@ -310,8 +310,8 @@ func TestEmitSMAuthnJWTOK_RedactsBearer(t *testing.T) {
 				continue
 			}
 			redacted, _ := ev.Payload["token_redacted"].(string)
-			if !strings.HasSuffix(redacted, "…REDACTED") {
-				t.Errorf("token_redacted missing …REDACTED marker: %q", redacted)
+			if !strings.HasSuffix(redacted, "...REDACTED") {
+				t.Errorf("token_redacted missing ...REDACTED marker: %q", redacted)
 			}
 			// Critical: full token must NOT appear in any payload field.
 			for k, v := range ev.Payload {

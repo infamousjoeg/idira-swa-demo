@@ -137,23 +137,29 @@ test('ttl counts down live and stays in sync between panes', async ({ page }) =>
   expect(secondsOf(t1Right!)).toBeLessThan(secondsOf(t0Right!));
 });
 
-test('no AI-generation markers in diagram, evidence, or inspector chrome', async ({ page }) => {
+test('no AI-generation markers in diagram, evidence, inspector chrome, or card backs', async ({ page }) => {
   await page.goto('/?pace=off');
   await page.fill('input[name="shipment_id"]', 'SHP-2049-883');
   await page.click('button.cta');
   await expect(page.locator('#evidence')).toBeVisible({ timeout: 5000 });
+
+  // M6: flip the JWT card so the back content is in the DOM for the brand-purity scan.
+  await expect(page.locator('#jwt-rect')).toHaveClass(/stage-rect--hero/, { timeout: 5000 });
+  await page.locator('#jwt-rect-host').click();
+  await page.waitForTimeout(300);
 
   // No emoji codepoints anywhere in rendered text.
   const text = await page.evaluate(() => document.body.innerText);
   // eslint-disable-next-line no-misleading-character-class
   expect(text).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
 
-  // No purple/pink hues in computed styles of diagram or evidence elements.
+  // No purple/pink hues in computed styles of diagram, evidence, or card backs.
   const hues = await page.evaluate(() => {
     const els = [
       ...document.querySelectorAll('#diagram *'),
       ...document.querySelectorAll('#evidence, #evidence *'),
       ...document.querySelectorAll('header.inspector__head *'),
+      ...document.querySelectorAll('foreignObject *'),
     ];
     return els.map(el => {
       const s = getComputedStyle(el);
@@ -163,12 +169,13 @@ test('no AI-generation markers in diagram, evidence, or inspector chrome', async
   expect(hues).not.toMatch(/rgb\(\s*(?:1[5-9][0-9]|2[0-4][0-9])\s*,\s*[0-9]{1,2}\s*,\s*(?:1[5-9][0-9]|2[0-4][0-9])/);
   // (Heuristic: matches purple/magenta R,G,B where R high, G low, B high.)
 
-  // No border-radius > 0 inside #diagram and #evidence.
+  // No border-radius > 0 inside #diagram, #evidence, or card backs.
   const radii = await page.evaluate(() => {
     const els = [
       ...document.querySelectorAll('#diagram *'),
       ...document.querySelectorAll('#evidence, #evidence *'),
       ...document.querySelectorAll('header.inspector__head *'),
+      ...document.querySelectorAll('foreignObject *'),
     ];
     return els.map(el => getComputedStyle(el).borderRadius);
   });
@@ -331,4 +338,22 @@ test('new resolve auto-unflips any open card', async ({ page }) => {
   await expect(page.locator('#jwt-rect-back-fo')).toHaveAttribute('visibility', 'visible', { timeout: 1000 });
   await page.click('button.cta');
   await expect(page.locator('#jwt-rect-back-fo')).toHaveAttribute('visibility', 'hidden', { timeout: 2000 });
+});
+
+test('SM back never displays the full bearer token', async ({ page }) => {
+  // Validator §13.4 #4: redaction discipline is enforced at the Go wire
+  // boundary (apps/carrier/handler.go via redactBearer before bus.Emit).
+  // This smoke is the end-to-end backstop -- a regression that lets the
+  // full bearer through fails here even if backend unit tests pass.
+  await page.goto('/?pace=off');
+  await page.fill('input[name="shipment_id"]', 'SHP-2049-883');
+  await page.click('button.cta');
+  await expect(page.locator('#sm-rect')).toHaveClass(/stage-rect--lit/, { timeout: 5000 });
+  const host = page.locator('#sm-rect-host');
+  await host.click();
+  await expect(page.locator('#sm-rect-back-fo')).toHaveAttribute('visibility', 'visible', { timeout: 1000 });
+  const text = await page.locator('#sm-rect-back-host').innerText();
+  expect(text).toContain('...REDACTED');
+  // Reject any base64url run of 60+ chars (would suggest an unredacted token).
+  expect(text).not.toMatch(/[A-Za-z0-9_-]{60,}/);
 });
