@@ -276,3 +276,59 @@ test('SKIP collapses the paced walk to instant completion', async ({ page }) => 
   // CTA returns to its original label.
   await expect(page.locator('button.cta')).toHaveText('RESOLVE SECRET', { timeout: 1000 });
 });
+
+// === M6 flip-card behavior coverage ===
+// Spec docs/superpowers/specs/2026-05-29-flip-card-detail-view-design.md.
+
+type CardCase = { id: string; expect: RegExp[] };
+const CARDS: CardCase[] = [
+  { id: 'portal-rect',  expect: [/subject/i, /issuer/i, /fingerprint|sha-?256/i] },
+  { id: 'carrier-rect', expect: [/subject/i, /issuer/i, /fingerprint|sha-?256/i] },
+  { id: 'jwt-rect',     expect: [/"aud"/, /"exp"/, /"sub"/] },
+  { id: 'sm-rect',      expect: [/method|POST/i, /url/i, /bearer|ttl/i] },
+  { id: 'secret-rect',  expect: [/secret id|method|GET/i, /bytes/i, /scope/i] },
+];
+
+for (const c of CARDS) {
+  test(`flip card ${c.id} reveals raw detail`, async ({ page }) => {
+    await page.goto('/?pace=off');
+    await page.fill('input[name="shipment_id"]', 'SHP-2049-883');
+    await page.click('button.cta');
+    const rectStateClass = c.id === 'jwt-rect' ? /stage-rect--hero/ : /stage-rect--lit/;
+    await expect(page.locator('#' + c.id)).toHaveClass(rectStateClass, { timeout: 5000 });
+    const host = page.locator(`#${c.id}-host`);
+    await host.click();
+    const fo = page.locator(`#${c.id}-back-fo`);
+    await expect(fo).toHaveAttribute('visibility', 'visible', { timeout: 1000 });
+    const text = await page.locator(`#${c.id}-back-host`).innerText();
+    for (const re of c.expect) {
+      expect(text).toMatch(re);
+    }
+  });
+}
+
+test('clicking a different card auto-unflips the prior one', async ({ page }) => {
+  await page.goto('/?pace=off');
+  await page.fill('input[name="shipment_id"]', 'SHP-2049-883');
+  await page.click('button.cta');
+  await expect(page.locator('#jwt-rect')).toHaveClass(/stage-rect--hero/, { timeout: 5000 });
+  const portalHost = page.locator('#portal-rect-host');
+  const jwtHost = page.locator('#jwt-rect-host');
+  await portalHost.click();
+  await expect(page.locator('#portal-rect-back-fo')).toHaveAttribute('visibility', 'visible', { timeout: 1000 });
+  await jwtHost.click();
+  await expect(page.locator('#portal-rect-back-fo')).toHaveAttribute('visibility', 'hidden', { timeout: 1000 });
+  await expect(page.locator('#jwt-rect-back-fo')).toHaveAttribute('visibility', 'visible', { timeout: 1000 });
+});
+
+test('new resolve auto-unflips any open card', async ({ page }) => {
+  await page.goto('/?pace=off');
+  await page.fill('input[name="shipment_id"]', 'SHP-2049-883');
+  await page.click('button.cta');
+  await expect(page.locator('#jwt-rect')).toHaveClass(/stage-rect--hero/, { timeout: 5000 });
+  const jwtHost = page.locator('#jwt-rect-host');
+  await jwtHost.click();
+  await expect(page.locator('#jwt-rect-back-fo')).toHaveAttribute('visibility', 'visible', { timeout: 1000 });
+  await page.click('button.cta');
+  await expect(page.locator('#jwt-rect-back-fo')).toHaveAttribute('visibility', 'hidden', { timeout: 2000 });
+});
