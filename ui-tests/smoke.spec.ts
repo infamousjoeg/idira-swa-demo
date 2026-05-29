@@ -216,3 +216,20 @@ test('carrier unreachable: mtls stage shows error, evidence stays hidden', async
     execSync('kubectl -n swa-demo wait --for=condition=available --timeout=60s deploy/carrier', { stdio: 'pipe' });
   }
 });
+
+test('paced walk reveals stages sequentially under ?pace=slow', async ({ page }) => {
+  await page.goto('/?pace=slow');
+  await page.fill('input[name="shipment_id"]', 'SHP-2049-883');
+  await page.click('button.cta');
+
+  // Immediately after click (well under one slow-pace tick of 600ms):
+  // portal-rect should already be lit, but secret-rect MUST NOT be.
+  await expect(page.locator('#portal-rect')).toHaveClass(/stage-rect--lit/, { timeout: 1500 });
+  await expect(page.locator('#secret-rect')).not.toHaveClass(/stage-rect--lit/);
+
+  // After the full slow walk (sum of weights ≈ 6.7 × 600ms ≈ 4s + slack),
+  // all stages should be lit and the secret block painted.
+  await expect(page.locator('#secret-rect')).toHaveClass(/stage-rect--lit/, { timeout: 8000 });
+  await expect(page.locator('#sm-rect')).toHaveClass(/stage-rect--lit/);
+  await expect(page.locator('#jwt-rect')).toHaveClass(/stage-rect--hero/);
+});
