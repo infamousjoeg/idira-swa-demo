@@ -34,6 +34,18 @@ func run() error {
 	if carrierSPIFFE == "" {
 		carrierSPIFFE = "spiffe://idira.demo/kind-ng/ns/swa-demo/sa/carrier"
 	}
+	serverGroup := os.Getenv("IDIRA_SERVER_GROUP")
+	if serverGroup == "" {
+		serverGroup = "kind-sg"
+	}
+	attestor := os.Getenv("IDIRA_ATTESTOR")
+	if attestor == "" {
+		attestor = "k8s_psat"
+	}
+	secretID := os.Getenv("CARRIER_SECRET_ID")
+	if secretID == "" {
+		secretID = "swa-demo/carrier/api-key"
+	}
 	socketPath := os.Getenv("SPIFFE_ENDPOINT_SOCKET")
 	if socketPath == "" {
 		// In-container default — matches the volumeMount in portal.deployment.yaml.
@@ -60,6 +72,11 @@ func run() error {
 	}
 	bus := NewTraceBus(256)
 	carrier := NewCarrierClient(src, carrierHost, peer, bus)
+	agg := newIdentityAggregator(src, carrier, identityConfig{
+		ServerGroup: serverGroup,
+		Attestor:    attestor,
+		SecretID:    secretID,
+	})
 
 	ui, err := fs.Sub(uiFS, "ui")
 	if err != nil {
@@ -68,6 +85,7 @@ func run() error {
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.FS(ui)))
 	mux.HandleFunc("/resolve", handleResolve(carrier, bus))
+	mux.HandleFunc("/identity", agg.handler())
 	mux.HandleFunc("/trace", handleTraceSSE(bus))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -88,9 +106,12 @@ func run() error {
 	bus.Emit(traceEvent{Source: "portal", Type: "boot", Payload: map[string]any{
 		"carrier_host":   carrierHost,
 		"carrier_spiffe": carrierSPIFFE,
+		"server_group":   serverGroup,
+		"attestor":       attestor,
+		"secret_id":      secretID,
 	}})
-	log.Printf("portal: listening on %s, carrier=%s, spiffe=%s",
-		srv.Addr, carrierHost, carrierSPIFFE)
+	log.Printf("portal: listening on %s, carrier=%s, spiffe=%s, server_group=%s, attestor=%s",
+		srv.Addr, carrierHost, carrierSPIFFE, serverGroup, attestor)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}

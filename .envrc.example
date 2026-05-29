@@ -19,5 +19,11 @@ export PANW_SM_TENANT=<your-subdomain>
 # then set this to "acme/swa-demo".
 export CONCEAL_NAMESPACE=<your-keychain-namespace>
 
-# Optional — kind cluster name (default "swa"):
+# Optional -- kind cluster name (default "swa"):
 # export KIND_CLUSTER=swa
+
+# === M4 hierarchy ribbon labels (informational, surfaced in portal UI) ===
+# These are display labels only -- they do not affect platform configuration.
+# Override if your Terraform module uses different names.
+export IDIRA_SERVER_GROUP=kind-sg
+export IDIRA_ATTESTOR=k8s_psat
