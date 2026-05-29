@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -77,9 +78,41 @@ func (c *CarrierClient) Lookup(ctx context.Context, shipmentID string) ([]byte, 
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	c.bus.Emit(traceEvent{Source: "portal", Type: "mtls.handshake.ok",
-		Payload: map[string]any{"peer_host": hostFromURL(c.baseURL),
-			"cipher": tlsCipherName(resp.TLS)}})
+		Payload: map[string]any{
+			"peer_host":    hostFromURL(c.baseURL),
+			"cipher":       tlsCipherName(resp.TLS),
+			"peer_san_uri": peerSANURI(resp.TLS),
+		}})
 	return body, resp.StatusCode, nil
+}
+
+// Identity fetches the carrier's /identity over the existing mTLS client.
+// Used by the portal /identity aggregator. Caching is the caller's concern.
+func (c *CarrierClient) Identity(ctx context.Context) (*identityResp, error) {
+	host := hostFromURL(c.baseURL)
+	url := fmt.Sprintf("https://%s:8444/identity", host)
+	return c.identityFromURL(ctx, url)
+}
+
+// identityFromURL is exposed for tests that need to point at a custom URL.
+func (c *CarrierClient) identityFromURL(ctx context.Context, url string) (*identityResp, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("carrier /identity: status %d", resp.StatusCode)
+	}
+	var out identityResp
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 // streamCarrierTrace opens an SSE-like read against carrier:/trace and
@@ -151,4 +184,19 @@ func tlsCipherName(s *tls.ConnectionState) string {
 		return "none"
 	}
 	return tls.CipherSuiteName(s.CipherSuite)
+}
+
+// peerSANURI returns the first SAN URI from the peer cert, or "" if none.
+// Plain-HTTP responses (no TLS state) and certs without a URI SAN both
+// return "" — emitting "" is correct: the inspector treats empty as "unknown"
+// without crashing.
+func peerSANURI(s *tls.ConnectionState) string {
+	if s == nil || len(s.PeerCertificates) == 0 {
+		return ""
+	}
+	uris := s.PeerCertificates[0].URIs
+	if len(uris) == 0 {
+		return ""
+	}
+	return uris[0].String()
 }
