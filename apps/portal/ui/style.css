@@ -20,6 +20,9 @@
   --font-headline: "TT Hoves", "Inter", -apple-system, sans-serif;
   --font-body:     "Helvetica Neue", Helvetica, Arial, -apple-system, sans-serif;
   --font-mono:     ui-monospace, "SF Mono", Menlo, monospace;
+
+  --bg-inspector-lift: #0F1428;
+  --bg-evidence:       #F5F7FE;
 }
 
 * { box-sizing: border-box; }
@@ -191,3 +194,61 @@ body {
 * { text-shadow: none !important; }
 .cta { box-shadow: none !important; border-radius: 0 !important; }
 .resolve input { border-radius: 0 !important; }
+
+/* === M4 diagram (right pane) === */
+.diagram { display: block; }
+.diagram svg { width: 100%; height: auto; display: block; }
+
+/* Stage state classes — added/removed by diagram.js on SVG children. */
+.diagram .stage-rect          { stroke: var(--text-mute); stroke-dasharray: 3 3; fill: none; transition: stroke 150ms ease-out, fill 150ms ease-out, stroke-dasharray 150ms ease-out; }
+.diagram .stage-rect--lit     { stroke: var(--idira-500); stroke-dasharray: 0; fill: var(--bg-inspector-lift); }
+.diagram .stage-rect--hero    { fill: var(--idira-500); stroke: var(--idira-500); stroke-dasharray: 0; }
+.diagram .stage-rect--pending { stroke: var(--idira-250); stroke-dasharray: 0; fill: none; }
+.diagram .stage-rect--err     { stroke: var(--panw-orange); stroke-dasharray: 0; }
+
+.diagram .conn        { stroke: var(--text-mute); stroke-dasharray: 3 3; transition: stroke 150ms ease-out, stroke-dasharray 150ms ease-out; }
+.diagram .conn--lit   { stroke: var(--idira-500); stroke-dasharray: 0; }
+.diagram .conn--pending { stroke: var(--idira-250); stroke-dasharray: 0; }
+.diagram .conn--err   { stroke: var(--panw-orange); stroke-dasharray: 0; }
+
+.diagram .label-mute    { fill: var(--text-mute); }
+.diagram .label-bright  { fill: #FFFFFF; }
+.diagram .label-idira   { fill: var(--idira-250); }
+.diagram .ttl-bar       { fill: #16317a; }
+.diagram .ttl-bar-fill  { fill: #FFFFFF; transition: width 1s linear; }
+
+.diagram .hint--idle     { fill: var(--idira-250); transition: opacity 150ms ease-out; }
+.diagram .hint--hidden   { opacity: 0; }
+
+.diagram .err-caption    { fill: var(--panw-orange); font-style: italic; }
+
+/* === M4 trust evidence card (left pane) === */
+.evidence {
+  margin-top: 20px;
+  padding: 16px 18px;
+  background: var(--bg-evidence);
+  border-left: 3px solid var(--idira-500);
+}
+.evidence[hidden] { display: none; }
+.evidence__eyebrow {
+  font: 700 10px/1 var(--font-body);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--idira-750);
+}
+.evidence__line {
+  font: 500 13px/22px var(--font-body);
+  color: var(--text);
+  margin: 10px 0 0;
+}
+.evidence__line b { color: var(--idira-750); font-weight: 700; }
+.evidence__line code, .evidence__line .mono {
+  font-family: var(--font-mono);
+}
+.evidence__sub {
+  font: 400 11px/16px var(--font-body);
+  color: var(--text-mute);
+  margin-top: 10px;
+}
+.evidence--dim { color: var(--text-mute); }
+.evidence--dim b { color: var(--text-mute); }

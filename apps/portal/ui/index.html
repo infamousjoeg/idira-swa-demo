@@ -25,18 +25,27 @@
     </form>
 
     <div id="result" class="result" aria-live="polite"></div>
+    <section id="evidence" class="evidence" hidden aria-live="polite">
+      <span class="evidence__eyebrow">Trust evidence</span>
+      <p class="evidence__line" data-slot="line1"></p>
+      <p class="evidence__line" data-slot="line2"></p>
+      <p class="evidence__line" data-slot="line3"></p>
+      <p class="evidence__sub">See the live trust diagram &rarr;</p>
+    </section>
   </section>
 
-  <!-- Right pane: the Idira inspector -->
-  <aside class="pane pane--inspector" aria-label="Idira inspector">
+  <!-- Right pane: live SPIFFE trust diagram (M4) -->
+  <aside class="pane pane--inspector" aria-label="Live SPIFFE trust diagram">
     <header class="inspector__head">
       <span class="inspector__eyebrow">Idira inspector</span>
       <span class="inspector__sub">spiffe / mtls / jwt-svid</span>
     </header>
-    <ol id="trace" class="trace" aria-live="polite"></ol>
+    <div id="diagram" class="diagram" aria-live="polite"></div>
   </aside>
 </div>
+<script type="module" src="ttl-ticker.js"></script>
 <script type="module" src="portal.js"></script>
-<script type="module" src="inspector.js"></script>
+<script type="module" src="diagram.js"></script>
+<script type="module" src="evidence.js"></script>
 </body>
 </html>
