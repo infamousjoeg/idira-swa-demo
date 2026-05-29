@@ -30,7 +30,7 @@ func TestAuthnJWT_PostsFormAndReturnsBase64Token(t *testing.T) {
 	defer srv.Close()
 
 	c := NewSMClient(srv.URL)
-	tok, err := c.AuthnJWT(t.Context(), wantJWT)
+	tok, meta, err := c.AuthnJWT(t.Context(), wantJWT)
 	if err != nil {
 		t.Fatalf("AuthnJWT: %v", err)
 	}
@@ -39,6 +39,9 @@ func TestAuthnJWT_PostsFormAndReturnsBase64Token(t *testing.T) {
 	}
 	if seenForm.Get("jwt") != wantJWT {
 		t.Errorf("body jwt: got %q want %q", seenForm.Get("jwt"), wantJWT)
+	}
+	if meta == nil || meta.URL == "" || meta.Method != "POST" || meta.Status != 200 {
+		t.Errorf("meta missing fields: %+v", meta)
 	}
 }
 
@@ -65,12 +68,16 @@ func TestFetchSecret_AuthorizationHeaderAndPath(t *testing.T) {
 	defer srv.Close()
 
 	c := NewSMClient(srv.URL)
-	got, err := c.FetchSecret(t.Context(), smToken, variableID)
+	got, meta, err := c.FetchSecret(t.Context(), smToken, variableID)
 	if err != nil {
 		t.Fatalf("FetchSecret: %v", err)
 	}
 	if string(got) != wantSecret {
 		t.Errorf("secret: got %q want %q", got, wantSecret)
+	}
+	if meta == nil || meta.Method != "GET" || meta.Status != 200 ||
+		meta.SecretID != variableID || meta.Bytes != len(wantSecret) {
+		t.Errorf("meta missing fields: %+v", meta)
 	}
 }
 
@@ -80,12 +87,47 @@ func TestAuthnJWT_NonOKStatusReturnsError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := NewSMClient(srv.URL).AuthnJWT(t.Context(), "x")
+	_, meta, err := NewSMClient(srv.URL).AuthnJWT(t.Context(), "x")
 	if err == nil {
 		t.Fatal("expected error on 401")
 	}
 	if !strings.Contains(err.Error(), "401") {
 		t.Errorf("error should mention status: %v", err)
+	}
+	// Meta is populated even on error so callers can log request shape.
+	if meta == nil || meta.Status != 401 {
+		t.Errorf("meta on error path missing status: %+v", meta)
+	}
+}
+
+// TestAuthnJWT_PopulatesMetaWithTTL asserts the TTL parser extracts a
+// positive TokenTTLSeconds when SM returns a realistic Conjur authentication
+// envelope. Plan Task 4 spec. The envelope format mirrors what the real SM
+// authn-jwt endpoint produces: base64({"protected":"...","payload":"<b64>","signature":"..."}).
+func TestAuthnJWT_PopulatesMetaWithTTL(t *testing.T) {
+	// Inner payload: Conjur tokens default to 8min TTL (480s).
+	payloadJSON := []byte(`{"sub":"host/swa-demo/carrier","iat":1748000000,"exp":1748000480}`)
+	payloadB64 := base64.RawURLEncoding.EncodeToString(payloadJSON)
+	envelope := []byte(`{"protected":"hdr","payload":"` + payloadB64 + `","signature":"sig"}`)
+	respToken := base64.StdEncoding.EncodeToString(envelope)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(respToken))
+	}))
+	defer srv.Close()
+
+	_, meta, err := NewSMClient(srv.URL).AuthnJWT(t.Context(), "fake.jwt.sig")
+	if err != nil {
+		t.Fatalf("AuthnJWT: %v", err)
+	}
+	if meta.URL == "" {
+		t.Error("URL must be populated")
+	}
+	if meta.Status != 200 {
+		t.Errorf("status=%d, want 200", meta.Status)
+	}
+	if meta.TokenTTLSeconds != 480 {
+		t.Errorf("TTL=%d, want 480", meta.TokenTTLSeconds)
 	}
 }
 
@@ -96,7 +138,7 @@ func TestAuthnJWT_DoesNotDecodeBase64(t *testing.T) {
 		w.Write([]byte(respToken))
 	}))
 	defer srv.Close()
-	tok, _ := NewSMClient(srv.URL).AuthnJWT(t.Context(), "x")
+	tok, _, _ := NewSMClient(srv.URL).AuthnJWT(t.Context(), "x")
 	if _, err := base64.StdEncoding.DecodeString(tok); err != nil {
 		t.Fatalf("returned token should still be base64-encoded; got %q", tok)
 	}

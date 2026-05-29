@@ -21,8 +21,8 @@ type jwtSource interface {
 }
 
 type smAPI interface {
-	AuthnJWT(ctx context.Context, jwtSVID string) (string, error)
-	FetchSecret(ctx context.Context, smToken, variableID string) ([]byte, error)
+	AuthnJWT(ctx context.Context, jwtSVID string) (string, *AuthnJWTMeta, error)
+	FetchSecret(ctx context.Context, smToken, variableID string) ([]byte, *FetchSecretMeta, error)
 }
 
 type handlerDeps struct {
@@ -156,17 +156,19 @@ func handleLookup(d handlerDeps) http.HandlerFunc {
 				"raw":       raw,
 			}})
 
-		smTok, err := d.sm.AuthnJWT(ctx, svid.Marshal())
+		smTok, _, err := d.sm.AuthnJWT(ctx, svid.Marshal())
 		if err != nil {
 			d.bus.Emit(traceEvent{Source: "carrier", Type: "sm.authn_jwt.err",
 				Payload: map[string]any{"err": err.Error()}})
 			http.Error(w, "identity rejected", http.StatusBadGateway)
 			return
 		}
+		// Metadata is captured but not yet emitted here -- Task 5 wires the
+		// full sm.authn_jwt.ok payload with redacted bearer + meta fields.
 		d.bus.Emit(traceEvent{Source: "carrier", Type: "sm.authn_jwt.ok",
 			Payload: map[string]any{"token_len": len(smTok)}})
 
-		secret, err := d.sm.FetchSecret(ctx, smTok, d.secretID)
+		secret, _, err := d.sm.FetchSecret(ctx, smTok, d.secretID)
 		if err != nil {
 			d.bus.Emit(traceEvent{Source: "carrier", Type: "sm.secret_fetched.err",
 				Payload: map[string]any{"err": err.Error()}})
@@ -178,6 +180,8 @@ func handleLookup(d handlerDeps) http.HandlerFunc {
 			http.Error(w, "empty secret", http.StatusBadGateway)
 			return
 		}
+		// Metadata is captured but not yet emitted here -- Task 6 wires the
+		// full sm.secret_fetched.ok payload with no-leak metadata.
 		d.bus.Emit(traceEvent{Source: "carrier", Type: "sm.secret_fetched.ok",
 			Payload: map[string]any{"bytes": len(secret)}})
 

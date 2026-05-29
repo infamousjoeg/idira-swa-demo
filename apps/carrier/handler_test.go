@@ -39,13 +39,40 @@ type stubSM struct {
 	authnErr   error
 	secret     []byte
 	secretErr  error
+	// authnMeta + secretMeta are returned alongside the payload. Defaults
+	// are filled in by the methods if left nil so existing tests don't have
+	// to construct them by hand.
+	authnMeta  *AuthnJWTMeta
+	secretMeta *FetchSecretMeta
 }
 
-func (s *stubSM) AuthnJWT(_ context.Context, _ string) (string, error) {
-	return s.authnToken, s.authnErr
+func (s *stubSM) AuthnJWT(_ context.Context, _ string) (string, *AuthnJWTMeta, error) {
+	m := s.authnMeta
+	if m == nil {
+		m = &AuthnJWTMeta{
+			URL: "https://sm.test.local/api/authn-jwt/secureWorkloadAccess/conjur/authenticate",
+			Method: "POST", Status: 200, TokenTTLSeconds: 480,
+			Scope: "secureWorkloadAccess/conjur",
+		}
+	}
+	if s.authnErr != nil {
+		return "", m, s.authnErr
+	}
+	return s.authnToken, m, nil
 }
-func (s *stubSM) FetchSecret(_ context.Context, _, _ string) ([]byte, error) {
-	return s.secret, s.secretErr
+func (s *stubSM) FetchSecret(_ context.Context, _, vid string) ([]byte, *FetchSecretMeta, error) {
+	m := s.secretMeta
+	if m == nil {
+		m = &FetchSecretMeta{
+			URL: "https://sm.test.local/api/secrets/conjur/variable/" + vid,
+			Method: "GET", Status: 200, SecretID: vid, PolicyScope: vid,
+			Bytes: len(s.secret),
+		}
+	}
+	if s.secretErr != nil {
+		return nil, m, s.secretErr
+	}
+	return s.secret, m, nil
 }
 
 func newTestDeps(t *testing.T, sm smAPI, jwtErr, smErr error) handlerDeps {
