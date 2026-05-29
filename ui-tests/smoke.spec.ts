@@ -12,7 +12,7 @@ const EXPECTED_EVENT_TYPES = [
 ];
 
 test('portal loads with brand-correct shell', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?pace=off');
   await expect(page).toHaveTitle(/Praetor Logistics/);
   await expect(page.locator('.lockup__mark')).toHaveText('Idira');
   await expect(page.locator('.cta')).toHaveText('RESOLVE SECRET');
@@ -74,7 +74,7 @@ test('resolving a shipment drives the full SPIFFE → SM → fixture sequence', 
     };
   });
 
-  await page.goto('/');
+  await page.goto('/?pace=off');
   await page.fill('input[name="shipment_id"]', 'SHP-2049-883');
   await page.click('button.cta');
 
@@ -113,14 +113,14 @@ test('resolving a shipment drives the full SPIFFE → SM → fixture sequence', 
 });
 
 test('unknown shipment surfaces not-found, does NOT crash UI', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?pace=off');
   await page.fill('input[name="shipment_id"]', 'SHP-DOES-NOT-EXIST');
   await page.click('button.cta');
   await expect(page.locator('.result__row .result__v').first()).toHaveText(/not found/i, { timeout: 5000 });
 });
 
 test('ttl counts down live and stays in sync between panes', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?pace=off');
   await page.fill('input[name="shipment_id"]', 'SHP-2049-883');
   await page.click('button.cta');
   await expect(page.locator('#evidence-ttl')).toHaveText(/^\d+m \d{2}s$/, { timeout: 5000 });
@@ -138,7 +138,7 @@ test('ttl counts down live and stays in sync between panes', async ({ page }) =>
 });
 
 test('no AI-generation markers in diagram or evidence', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?pace=off');
   await page.fill('input[name="shipment_id"]', 'SHP-2049-883');
   await page.click('button.cta');
   await expect(page.locator('#evidence')).toBeVisible({ timeout: 5000 });
@@ -195,7 +195,7 @@ test('carrier unreachable: mtls stage shows error, evidence stays hidden', async
     // Wait briefly for endpoints to drain.
     execSync('sleep 3');
 
-    await page.goto('/');
+    await page.goto('/?pace=off');
     await page.fill('input[name="shipment_id"]', 'SHP-2049-883');
     await page.click('button.cta');
 
