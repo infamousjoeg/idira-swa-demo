@@ -124,3 +124,55 @@ func TestIdentityAggregator_CachesCarrierFor30s(t *testing.T) {
 func makePortalTestSVID(t *testing.T) *x509svid.SVID {
 	return makeRSATestSVID(t, "spiffe://idira.demo/kind-ng/ns/swa-demo/sa/portal", time.Hour)
 }
+
+// TestIdentity_IncludesCertMetadata asserts the M6 cert-metadata fields are
+// populated on portal_svid from the underlying X.509 cert. Spec §5 of the
+// 2026-05-29 flip-card-detail-view design + plan Task 1.
+func TestIdentity_IncludesCertMetadata(t *testing.T) {
+	carrier := &stubCarrierIdentity{resp: &identityResp{
+		SANURI:            "spiffe://idira.demo/kind-ng/ns/swa-demo/sa/carrier",
+		SubjectDN:         "CN=carrier",
+		IssuerDN:          "CN=carrier",
+		Serial:            "1",
+		SigAlg:            "SHA256-RSA",
+		FingerprintSHA256: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+	}}
+	agg := newIdentityAggregator(stubLocalX509{svid: makePortalTestSVID(t)}, carrier,
+		identityConfig{ServerGroup: "kind-sg", Attestor: "k8s_psat", SecretID: "swa-demo/carrier/api-key"})
+
+	req := httptest.NewRequest(http.MethodGet, "/identity", nil)
+	w := httptest.NewRecorder()
+	agg.handler()(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var got identityFullResp
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.PortalSVID == nil {
+		t.Fatal("portal_svid missing")
+	}
+	p := got.PortalSVID
+	if p.SubjectDN == "" {
+		t.Error("portal_svid.subject_dn empty")
+	}
+	if p.IssuerDN == "" {
+		t.Error("portal_svid.issuer_dn empty")
+	}
+	if p.Serial == "" {
+		t.Error("portal_svid.serial empty")
+	}
+	if p.SigAlg == "" {
+		t.Error("portal_svid.sig_alg empty")
+	}
+	if len(p.FingerprintSHA256) != 64 {
+		t.Errorf("portal_svid.fingerprint_sha256 must be 64 hex chars; got %d (%q)", len(p.FingerprintSHA256), p.FingerprintSHA256)
+	}
+	// carrier_svid pass-through from the stub above must also surface the
+	// fields (proves the aggregator preserves them on the wire).
+	if got.CarrierSVID == nil || got.CarrierSVID.FingerprintSHA256 == "" {
+		t.Errorf("carrier_svid cert metadata not preserved: %+v", got.CarrierSVID)
+	}
+}

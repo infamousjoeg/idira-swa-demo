@@ -5,6 +5,9 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -79,12 +82,18 @@ func (a *identityAggregator) snapshot(ctx context.Context) (identityFullResp, in
 		return out, http.StatusServiceUnavailable
 	}
 	pcert := psvid.Certificates[0]
+	subj, iss, serial, sigAlg, fp := certMetadata(pcert)
 	out.PortalSVID = &identityResp{
-		SANURI:          psvid.ID.String(),
-		NotBefore:       pcert.NotBefore.UTC(),
-		NotAfter:        pcert.NotAfter.UTC(),
-		KeyAlg:          keyAlgString(pcert.PublicKey),
-		RotationMinutes: int(pcert.NotAfter.Sub(pcert.NotBefore) / time.Minute),
+		SANURI:            psvid.ID.String(),
+		NotBefore:         pcert.NotBefore.UTC(),
+		NotAfter:          pcert.NotAfter.UTC(),
+		KeyAlg:            keyAlgString(pcert.PublicKey),
+		RotationMinutes:   int(pcert.NotAfter.Sub(pcert.NotBefore) / time.Minute),
+		SubjectDN:         subj,
+		IssuerDN:          iss,
+		Serial:            serial,
+		SigAlg:            sigAlg,
+		FingerprintSHA256: fp,
 	}
 	out.TrustDomain = psvid.ID.TrustDomain().String()
 	out.NodeGroup = firstPathSegment(psvid.ID.Path())
@@ -119,6 +128,26 @@ func firstPathSegment(path string) string {
 		return trimmed[:i]
 	}
 	return trimmed
+}
+
+// certMetadata extracts the M6 cert-detail fields from an X.509 cert in a
+// single pass: subject DN, issuer DN, hex serial, signature algorithm name,
+// and a hex-encoded SHA-256 fingerprint of the DER bytes. Mirrors the same
+// helper in apps/carrier/identity.go. Spec §5 of the 2026-05-29 flip-card
+// detail-view design.
+func certMetadata(cert *x509.Certificate) (subj, iss, serial, sigAlg, fingerprint string) {
+	if cert == nil {
+		return "", "", "", "", ""
+	}
+	subj = cert.Subject.String()
+	iss = cert.Issuer.String()
+	if cert.SerialNumber != nil {
+		serial = cert.SerialNumber.Text(16)
+	}
+	sigAlg = cert.SignatureAlgorithm.String()
+	sum := sha256.Sum256(cert.Raw)
+	fingerprint = hex.EncodeToString(sum[:])
+	return subj, iss, serial, sigAlg, fingerprint
 }
 
 // keyAlgString duplicates the carrier-side helper. Same justification as identityResp.

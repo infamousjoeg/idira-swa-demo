@@ -101,3 +101,34 @@ func TestIdentity_SourceErrorReturns500(t *testing.T) {
 		t.Errorf("status=%d", w.Code)
 	}
 }
+
+// TestIdentity_IncludesCertMetadata asserts the M6 cert-metadata fields are
+// populated from the underlying X.509 cert. Spec §5 of the 2026-05-29
+// flip-card-detail-view design + plan Task 1.
+func TestIdentity_IncludesCertMetadata(t *testing.T) {
+	svid := makeRSATestSVID(t, "spiffe://idira.demo/kind-ng/ns/swa-demo/sa/carrier", 60*time.Minute)
+	w := httptest.NewRecorder()
+	handleIdentity(stubX509Source{svid: svid})(w, httptest.NewRequest("GET", "/identity", nil))
+	if w.Code != 200 {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var got identityResp
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.SubjectDN == "" {
+		t.Error("subject_dn empty")
+	}
+	if got.IssuerDN == "" {
+		t.Error("issuer_dn empty")
+	}
+	if got.Serial == "" {
+		t.Error("serial empty")
+	}
+	if got.SigAlg == "" {
+		t.Error("sig_alg empty")
+	}
+	if len(got.FingerprintSHA256) != 64 {
+		t.Errorf("fingerprint_sha256 must be 64 hex chars; got %d (%q)", len(got.FingerprintSHA256), got.FingerprintSHA256)
+	}
+}
