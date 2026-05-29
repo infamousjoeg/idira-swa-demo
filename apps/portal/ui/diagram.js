@@ -245,7 +245,8 @@ const DISPATCH = {
     setText('jwt-sub', ev.payload?.spiffe_id || '');
     setText('jwt-aud', ev.payload?.aud || '');
     setText('jwt-alg', ev.payload?.alg || '');
-    setText('jwt-kid', ev.payload?.kid || '');
+    const kid = ev.payload?.kid || '';
+    setText('jwt-kid', kid.length > 12 ? kid.split('-')[0] + '…' : kid);
     setText('jwt-header', 'CARRIER · JWT-SVID  ·  PRESENTING');
     setConnState('to-sm', 'pending');
     setText('to-sm-label', 'POST /api/authn-jwt/… (in flight)');
