@@ -232,6 +232,17 @@ const DISPATCH = {
   'mtls.handshake.start': () => {
     setConnState('mtls-line', 'lit');
     setText('mtls-label', 'mTLS');
+    // Optimistically mark carrier as "we're reaching for it" so the card lights
+    // in visual order. mtls.handshake.ok is emitted only after the full HTTP
+    // response is read, by which time the carrier has already issued the JWT,
+    // hit SM, and returned the secret — leaving carrier-rect dark until last
+    // unless we surface a pending state up front.
+    setRectState('carrier-rect', 'pending');
+  },
+  'mtls.handshake.err': () => {
+    // Flip the pending carrier card to err so it doesn't sit half-lit when
+    // the connection actually failed. handleError() will still mark the line.
+    setRectState('carrier-rect', 'err');
   },
   'mtls.handshake.ok': (ev) => {
     setRectState('carrier-rect', 'lit');
