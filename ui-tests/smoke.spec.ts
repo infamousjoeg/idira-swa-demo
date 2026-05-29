@@ -181,3 +181,38 @@ function secondsOf(mss: string): number {
   if (!m) return -1;
   return Number(m[1]) * 60 + Number(m[2]);
 }
+
+test('carrier unreachable: mtls stage shows error, evidence stays hidden', async ({ page }) => {
+  // Scale carrier to 0; revert at end. Skip if kubectl unavailable.
+  const { execSync } = require('child_process');
+  try {
+    execSync('kubectl -n swa-demo scale deploy/carrier --replicas=0', { stdio: 'pipe' });
+  } catch {
+    test.skip(true, 'kubectl not available for failure-path test');
+    return;
+  }
+  try {
+    // Wait briefly for endpoints to drain.
+    execSync('sleep 3');
+
+    await page.goto('/');
+    await page.fill('input[name="shipment_id"]', 'SHP-2049-883');
+    await page.click('button.cta');
+
+    // mTLS line picks up conn--err class. ERROR_MAP routes mtls.handshake.err
+    // to mtls-line with kind=line; setConnState applies the class.
+    await expect(page.locator('#mtls-line')).toHaveClass(/conn--err/, { timeout: 8000 });
+
+    // Carrier card never lit.
+    await expect(page.locator('#carrier-rect')).not.toHaveClass(/stage-rect--lit/);
+
+    // Error caption visible somewhere in the diagram.
+    await expect(page.locator('#mtls-line-err-caption')).toBeVisible();
+
+    // Evidence card MUST stay hidden — we never reached sm.secret_fetched.ok.
+    await expect(page.locator('#evidence')).toBeHidden();
+  } finally {
+    execSync('kubectl -n swa-demo scale deploy/carrier --replicas=1', { stdio: 'pipe' });
+    execSync('kubectl -n swa-demo wait --for=condition=available --timeout=60s deploy/carrier', { stdio: 'pipe' });
+  }
+});
