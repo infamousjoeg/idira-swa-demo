@@ -237,12 +237,34 @@ test('paced walk reveals stages sequentially under ?pace=slow', async ({ page })
 });
 
 test('SKIP collapses the paced walk to instant completion', async ({ page }) => {
+  // Track when the climax event has hit the SSE so we don't race the queue:
+  // backend trace fan-out completes a few hundred ms after click, but the
+  // pace-queue holds events under slow pace. SKIP must drain a queue that
+  // already contains every backend event for the assertion below to mean
+  // anything; without this, SKIP can fire before secret_fetched.ok has
+  // crossed the wire and the queue drains a partial walk.
+  await page.addInitScript(() => {
+    (window as any).__lastSecretEv = null;
+    const es = new EventSource('/trace');
+    es.onmessage = (ev) => {
+      try {
+        let p = JSON.parse(ev.data);
+        if (p.type === 'carrier.event.raw' && p.payload?.frame) p = JSON.parse(p.payload.frame);
+        if (p.type === 'sm.secret_fetched.ok') (window as any).__lastSecretEv = Date.now();
+      } catch {}
+    };
+  });
+
   await page.goto('/?pace=slow');
   await page.fill('input[name="shipment_id"]', 'SHP-2049-883');
   await page.click('button.cta');
 
   // Mid-walk: CTA should have flipped to SKIP within ~1 stage tick.
   await expect(page.locator('button.cta')).toHaveText('SKIP', { timeout: 1500 });
+
+  // Wait until the backend's secret_fetched.ok has reached the wire (so the
+  // queue holds every event SKIP needs to drain).
+  await page.waitForFunction(() => (window as any).__lastSecretEv !== null, { timeout: 5000 });
 
   // Click SKIP; the queue must collapse the rest of the walk synchronously.
   await page.click('button.cta');
