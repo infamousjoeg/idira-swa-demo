@@ -233,3 +233,22 @@ test('paced walk reveals stages sequentially under ?pace=slow', async ({ page })
   await expect(page.locator('#sm-rect')).toHaveClass(/stage-rect--lit/);
   await expect(page.locator('#jwt-rect')).toHaveClass(/stage-rect--hero/);
 });
+
+test('SKIP collapses the paced walk to instant completion', async ({ page }) => {
+  await page.goto('/?pace=slow');
+  await page.fill('input[name="shipment_id"]', 'SHP-2049-883');
+  await page.click('button.cta');
+
+  // Mid-walk: CTA should have flipped to SKIP within ~1 stage tick.
+  await expect(page.locator('button.cta')).toHaveText('SKIP', { timeout: 1500 });
+
+  // Click SKIP; the queue must collapse the rest of the walk synchronously.
+  await page.click('button.cta');
+
+  // All stages lit within 1 second of SKIP click (allow some Playwright slack).
+  await expect(page.locator('#secret-rect')).toHaveClass(/stage-rect--lit/, { timeout: 1000 });
+  await expect(page.locator('#sm-rect')).toHaveClass(/stage-rect--lit/);
+
+  // CTA returns to its original label.
+  await expect(page.locator('button.cta')).toHaveText('RESOLVE SECRET', { timeout: 1000 });
+});
