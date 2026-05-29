@@ -1,0 +1,208 @@
+// diagram.js — live SPIFFE trust diagram. Replaces inspector.js.
+//
+// Lifecycle:
+//   1. On import, render the SVG skeleton into #diagram (all stages in idle state).
+//   2. fetch('/identity') and populate hierarchy ribbon + workload SAN URIs.
+//   3. (Task 10) Subscribe to /trace SSE and mutate SVG classes on each event.
+//   4. (Task 11) Subscribe to the TTL ticker to update the JWT-SVID hero countdown.
+
+import { setIssuedAndExp, subscribe as subscribeTTL, formatMSS } from './ttl-ticker.js';
+
+const root = document.getElementById('diagram');
+if (root) renderSkeleton(root);
+
+let identityCache = null;
+
+async function loadIdentity() {
+  try {
+    const resp = await fetch('/identity', { headers: { 'Accept': 'application/json' } });
+    if (!resp.ok) throw new Error(`/identity ${resp.status}`);
+    identityCache = await resp.json();
+    paintIdentity(identityCache);
+  } catch (err) {
+    console.error('diagram: /identity failed:', err);
+    paintIdentityUnavailable();
+  }
+}
+
+function renderSkeleton(host) {
+  // Coordinates pulled directly from spec §5.1 / Frame 1 mockup. Keep this
+  // SVG hand-authored — no string templating, no D3 — so the structure is
+  // greppable when something looks wrong.
+  host.innerHTML = `
+<svg viewBox="0 0 580 720" xmlns="http://www.w3.org/2000/svg" aria-label="SPIFFE trust diagram">
+  <defs>
+    <marker id="ar"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" class="conn-arrow"/></marker>
+    <marker id="arl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" class="conn-arrow"/></marker>
+    <marker id="arr" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="conn-arrow"/></marker>
+  </defs>
+
+  <!-- Hierarchy ribbon: always lit, populated from /identity -->
+  <g id="hierarchy">
+    <rect x="10" y="6"  width="560" height="30" fill="none" stroke="#173EB8"/>
+    <text x="22" y="24" font-family="Helvetica Neue" font-size="9" font-weight="700" letter-spacing="2.2" class="label-idira">TRUST DOMAIN</text>
+    <text x="200" y="25" font-family="ui-monospace,Menlo" font-size="12" fill="#FFFFFF" id="td-val">—</text>
+    <line x1="190" y1="6" x2="190" y2="36" stroke="#173EB8"/>
+
+    <rect x="10" y="36" width="560" height="30" fill="none" stroke="#173EB8"/>
+    <text x="22" y="55" font-family="Helvetica Neue" font-size="9" font-weight="700" letter-spacing="2.2" class="label-idira">SERVER GROUP</text>
+    <text x="200" y="55" font-family="ui-monospace,Menlo" font-size="12" fill="#FFFFFF" id="sg-val">—</text>
+    <text x="290" y="55" font-family="Helvetica Neue" font-size="10" class="label-mute">attestor:</text>
+    <text x="340" y="55" font-family="ui-monospace,Menlo" font-size="11" class="label-idira" id="attestor-val">—</text>
+    <line x1="190" y1="36" x2="190" y2="66" stroke="#173EB8"/>
+
+    <rect x="10" y="66" width="560" height="30" fill="none" stroke="#173EB8"/>
+    <text x="22" y="85" font-family="Helvetica Neue" font-size="9" font-weight="700" letter-spacing="2.2" class="label-idira">NODE GROUP</text>
+    <text x="200" y="85" font-family="ui-monospace,Menlo" font-size="12" fill="#FFFFFF" id="ng-val">—</text>
+  </g>
+
+  <!-- Branch connector -->
+  <line x1="290" y1="96"  x2="290" y2="120" class="conn" id="branch-stem"/>
+  <line x1="130" y1="120" x2="450" y2="120" class="conn" id="branch-cross"/>
+  <line x1="130" y1="120" x2="130" y2="140" class="conn" id="branch-l" marker-end="url(#ar)"/>
+  <line x1="450" y1="120" x2="450" y2="140" class="conn" id="branch-r" marker-end="url(#ar)"/>
+
+  <!-- Portal X.509-SVID card -->
+  <g id="portal-card">
+    <rect x="10" y="140" width="250" height="130" class="stage-rect" id="portal-rect"/>
+    <text x="22" y="160" font-size="9" font-weight="700" letter-spacing="2" class="label-idira">PORTAL · X.509-SVID</text>
+    <text x="22" y="180" font-size="8" font-weight="700" letter-spacing="1.6" class="label-mute">SAN URI</text>
+    <text x="22" y="195" font-family="ui-monospace,Menlo" font-size="10" class="label-idira" id="portal-san-1">—</text>
+    <text x="22" y="208" font-family="ui-monospace,Menlo" font-size="10" class="label-idira" id="portal-san-2"></text>
+    <text x="22" y="234" font-size="8" font-weight="700" letter-spacing="1.6" class="label-mute" id="portal-valid-label">VALID</text>
+    <text x="64" y="234" font-family="ui-monospace,Menlo" font-size="11" fill="#FFFFFF" id="portal-valid-val">—</text>
+    <rect x="22" y="240" width="226" height="4" fill="#16317a"/>
+    <rect x="22" y="240" width="0"   height="4" fill="#265BFF" id="portal-valid-bar"/>
+    <text x="22" y="262" font-size="8" class="label-idira" id="portal-rotation">—</text>
+  </g>
+
+  <!-- Carrier X.509-SVID card -->
+  <g id="carrier-card">
+    <rect x="320" y="140" width="250" height="130" class="stage-rect" id="carrier-rect"/>
+    <text x="332" y="160" font-size="9" font-weight="700" letter-spacing="2" class="label-idira">CARRIER · X.509-SVID</text>
+    <text x="332" y="180" font-size="8" font-weight="700" letter-spacing="1.6" class="label-mute">SAN URI</text>
+    <text x="332" y="195" font-family="ui-monospace,Menlo" font-size="10" class="label-idira" id="carrier-san-1">—</text>
+    <text x="332" y="208" font-family="ui-monospace,Menlo" font-size="10" class="label-idira" id="carrier-san-2"></text>
+    <text x="332" y="234" font-size="8" font-weight="700" letter-spacing="1.6" class="label-mute" id="carrier-valid-label">VALID</text>
+    <text x="374" y="234" font-family="ui-monospace,Menlo" font-size="11" fill="#FFFFFF" id="carrier-valid-val">—</text>
+    <rect x="332" y="240" width="226" height="4" fill="#16317a"/>
+    <rect x="332" y="240" width="0"   height="4" fill="#265BFF" id="carrier-valid-bar"/>
+    <text x="332" y="262" font-size="8" class="label-idira" id="carrier-rotation">—</text>
+  </g>
+
+  <!-- mTLS edge -->
+  <g id="mtls-edge">
+    <line x1="260" y1="205" x2="320" y2="205" class="conn" id="mtls-line" marker-start="url(#arl)" marker-end="url(#arr)"/>
+    <text x="290" y="192" font-size="9" font-weight="700" letter-spacing="1.6" text-anchor="middle" class="label-mute" id="mtls-label">mTLS</text>
+    <text x="290" y="224" font-family="ui-monospace,Menlo" font-size="8" text-anchor="middle" class="label-idira" id="mtls-cipher"></text>
+  </g>
+
+  <!-- Connector to JWT hero -->
+  <line x1="450" y1="270" x2="450" y2="304" class="conn" id="to-jwt" marker-end="url(#ar)"/>
+  <text x="458" y="288" font-size="9" class="label-mute" id="to-jwt-label">workload-API issues</text>
+
+  <!-- JWT-SVID hero -->
+  <g id="jwt-hero">
+    <rect x="100" y="304" width="470" height="180" class="stage-rect" id="jwt-rect"/>
+    <text x="116" y="328" font-size="9" font-weight="700" letter-spacing="2.2" class="label-idira" id="jwt-header">CARRIER · JWT-SVID</text>
+    <text x="116" y="402" font-size="11" font-style="italic" class="label-idira" id="jwt-placeholder">issued on resolve · aud=conjur · alg=RS256 · ttl 5m</text>
+    <g id="jwt-fields" style="display:none">
+      <text x="116" y="354" font-size="8" font-weight="700" letter-spacing="1.6" class="label-idira">SUB CLAIM</text>
+      <text x="116" y="371" font-family="ui-monospace,Menlo" font-size="11" class="label-bright" id="jwt-sub">—</text>
+      <text x="116" y="402" font-size="8" font-weight="700" letter-spacing="1.6" class="label-idira">AUD</text>
+      <text x="148" y="402" font-family="ui-monospace,Menlo" font-size="11" class="label-bright" id="jwt-aud">—</text>
+      <text x="220" y="402" font-size="8" font-weight="700" letter-spacing="1.6" class="label-idira">ALG</text>
+      <text x="248" y="402" font-family="ui-monospace,Menlo" font-size="11" class="label-bright" id="jwt-alg">—</text>
+      <text x="310" y="402" font-size="8" font-weight="700" letter-spacing="1.6" class="label-idira">KID</text>
+      <text x="335" y="402" font-family="ui-monospace,Menlo" font-size="11" class="label-bright" id="jwt-kid">—</text>
+      <text x="116" y="434" font-size="8" font-weight="700" letter-spacing="1.6" class="label-idira">TTL</text>
+      <text x="142" y="434" font-family="ui-monospace,Menlo" font-size="13" class="label-bright" id="jwt-ttl">—</text>
+      <rect x="116" y="446" width="438" height="6" class="ttl-bar"/>
+      <rect x="116" y="446" width="0"   height="6" class="ttl-bar-fill" id="jwt-ttl-bar"/>
+      <text x="116" y="472" font-size="9" class="label-idira" id="jwt-jwks">signed by trust-domain JWKS</text>
+    </g>
+  </g>
+
+  <!-- Connector to SM block -->
+  <line x1="335" y1="484" x2="335" y2="514" class="conn" id="to-sm" marker-end="url(#ar)"/>
+  <text x="345" y="502" font-size="9" class="label-mute" id="to-sm-label"></text>
+
+  <!-- SM block -->
+  <g id="sm-block">
+    <rect x="100" y="514" width="470" height="60" class="stage-rect" id="sm-rect"/>
+    <text x="116" y="538" font-size="9" font-weight="700" letter-spacing="2.2" class="label-idira" id="sm-header">SECRETS MANAGER · SAAS</text>
+    <text x="116" y="558" font-size="10" font-style="italic" class="label-idira" id="sm-body">policy scoped to one variable</text>
+  </g>
+
+  <!-- Connector to Secret block -->
+  <line x1="335" y1="574" x2="335" y2="604" class="conn" id="to-secret" marker-end="url(#ar)"/>
+
+  <!-- Secret block -->
+  <g id="secret-block">
+    <rect x="100" y="604" width="470" height="60" class="stage-rect" id="secret-rect"/>
+    <text x="116" y="628" font-size="9" font-weight="700" letter-spacing="2.2" class="label-idira" id="secret-header">SECRET</text>
+    <text x="116" y="648" font-family="ui-monospace,Menlo" font-size="11" class="label-idira" id="secret-body">in-process · never on disk</text>
+  </g>
+
+  <!-- Hint -->
+  <text x="290" y="700" font-size="10" font-weight="700" letter-spacing="2.2" text-anchor="middle" class="hint--idle" id="hint">CLICK RESOLVE TO BEGIN</text>
+</svg>`;
+}
+
+function paintIdentity(id) {
+  setText('td-val', id.trust_domain || '—');
+  setText('sg-val', id.server_group || '—');
+  setText('ng-val', id.node_group || '—');
+  setText('attestor-val', id.attestor || '—');
+  paintSVIDCard('portal', id.portal_svid);
+  paintSVIDCard('carrier', id.carrier_svid);
+}
+
+function paintSVIDCard(role, svid) {
+  if (!svid) {
+    setText(`${role}-san-1`, 'unavailable');
+    setText(`${role}-san-2`, '');
+    setText(`${role}-valid-val`, '—');
+    return;
+  }
+  // Split the SPIFFE ID after /kind-ng/ so it wraps cleanly across two lines.
+  const uri = svid.san_uri || '';
+  const split = uri.indexOf('/ns/');
+  if (split > 0) {
+    setText(`${role}-san-1`, uri.slice(0, split + 1));
+    setText(`${role}-san-2`, uri.slice(split + 1));
+  } else {
+    setText(`${role}-san-1`, uri);
+    setText(`${role}-san-2`, '');
+  }
+  const ttlMin = computeMinutesLeft(svid.not_after);
+  setText(`${role}-valid-val`, `${ttlMin}m`);
+  const bar = document.getElementById(`${role}-valid-bar`);
+  if (bar) {
+    const rot = Math.max(1, svid.rotation_minutes || 60);
+    const frac = Math.max(0, Math.min(1, ttlMin / rot));
+    bar.setAttribute('width', String(Math.round(226 * frac)));
+  }
+  setText(`${role}-rotation`, `${svid.key_alg || ''} · rotates ${svid.rotation_minutes || 60}m`);
+}
+
+function paintIdentityUnavailable() {
+  setText('td-val', 'identity unavailable');
+}
+
+function computeMinutesLeft(iso) {
+  if (!iso) return 0;
+  const exp = Date.parse(iso) / 1000;
+  return Math.max(0, Math.floor((exp - Math.floor(Date.now() / 1000)) / 60));
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+// Kick off the load. Errors are handled inside loadIdentity().
+loadIdentity();
