@@ -7,6 +7,7 @@
 //   4. (Task 11) Subscribe to the TTL ticker to update the JWT-SVID hero countdown.
 
 import { setIssuedAndExp, subscribe as subscribeTTL, formatMSS } from './ttl-ticker.js';
+import { subscribe as subscribeTrace, onStateChange, skip as skipPace } from './pace-queue.js';
 
 const root = document.getElementById('diagram');
 if (root) renderSkeleton(root);
@@ -211,17 +212,10 @@ function setText(id, val) {
 loadIdentity();
 
 // === SSE consumer: drive state transitions ===
-
-const es = new EventSource('/trace');
-es.onmessage = (ev) => {
-  let parsed;
-  try { parsed = JSON.parse(ev.data); } catch { return; }
-  // Carrier events arrive wrapped — unwrap.
-  if (parsed.type === 'carrier.event.raw' && parsed.payload?.frame) {
-    try { parsed = JSON.parse(parsed.payload.frame); } catch {}
-  }
-  dispatch(parsed);
-};
+// Single subscription through pace-queue (which owns the only EventSource).
+// pace-queue unwraps carrier.event.raw frames before fanout, so dispatch()
+// always receives the inner event.
+subscribeTrace(dispatch);
 
 function dispatch(ev) {
   const handler = DISPATCH[ev.type];
@@ -389,3 +383,34 @@ subscribeTTL(({ remaining, fraction }) => {
   // Border flips orange when expired.
   if (remaining === 0) setRectState('jwt-rect', 'err');
 });
+
+// === CTA flip: RESOLVE ↔ SKIP ===
+// While pace-queue is draining a walk, the resolve button becomes SKIP.
+// Clicking SKIP calls skipPace() which collapses the rest of the queue to
+// real-time so all remaining stages paint immediately. Spec §6.6.
+
+const cta = document.querySelector('button.cta');
+let originalLabel = cta?.textContent || 'RESOLVE SECRET';
+
+onStateChange((state) => {
+  if (!cta) return;
+  if (state === 'walking') {
+    if (cta.textContent !== 'SKIP') originalLabel = cta.textContent;
+    cta.textContent = 'SKIP';
+    cta.dataset.paceMode = 'skip';
+  } else {
+    cta.textContent = originalLabel;
+    delete cta.dataset.paceMode;
+  }
+});
+
+// Intercept clicks while in SKIP mode and route to skip() instead of letting
+// the form submit. The existing form submit handler (in portal.js) is
+// untouched; it only runs when paceMode is unset.
+cta?.addEventListener('click', (e) => {
+  if (cta.dataset.paceMode === 'skip') {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    skipPace();
+  }
+}, true);  // capture phase so this fires before portal.js's submit handler
