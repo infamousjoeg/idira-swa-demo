@@ -137,7 +137,7 @@ test('ttl counts down live and stays in sync between panes', async ({ page }) =>
   expect(secondsOf(t1Right!)).toBeLessThan(secondsOf(t0Right!));
 });
 
-test('no AI-generation markers in diagram or evidence', async ({ page }) => {
+test('no AI-generation markers in diagram, evidence, or inspector chrome', async ({ page }) => {
   await page.goto('/?pace=off');
   await page.fill('input[name="shipment_id"]', 'SHP-2049-883');
   await page.click('button.cta');
@@ -153,6 +153,7 @@ test('no AI-generation markers in diagram or evidence', async ({ page }) => {
     const els = [
       ...document.querySelectorAll('#diagram *'),
       ...document.querySelectorAll('#evidence, #evidence *'),
+      ...document.querySelectorAll('header.inspector__head *'),
     ];
     return els.map(el => {
       const s = getComputedStyle(el);
@@ -167,6 +168,7 @@ test('no AI-generation markers in diagram or evidence', async ({ page }) => {
     const els = [
       ...document.querySelectorAll('#diagram *'),
       ...document.querySelectorAll('#evidence, #evidence *'),
+      ...document.querySelectorAll('header.inspector__head *'),
     ];
     return els.map(el => getComputedStyle(el).borderRadius);
   });
