@@ -48,17 +48,21 @@ function drain() {
   }
   const ev = queue.shift();
   fanout(ev);
-  if (queue.length === 0) {
-    skipMode = false;
-    setWalking(false);
-    return;
-  }
   const pace = skipMode ? 0 : currentPace;
   if (pace === 0) {
-    // Real-time recursion path: drain everything synchronously.
+    // Real-time path: drain everything synchronously, then idle.
+    if (queue.length === 0) {
+      skipMode = false;
+      setWalking(false);
+      return;
+    }
     drain();
     return;
   }
+  // Paced path: hold "walking" state for at least pace*weight ms after each
+  // fanout, regardless of whether the queue currently has more items. Events
+  // arriving from SSE during this window get queued and drained on the tick.
+  // If the queue is still empty when the timer fires, drain() flips to idle.
   const weight = STAGE_WEIGHTS[queue[0]?.type] ?? 1.0;
   pendingTimer = setTimeout(drain, pace * weight);
 }
