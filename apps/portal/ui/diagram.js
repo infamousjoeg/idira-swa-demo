@@ -8,6 +8,8 @@
 
 import { setIssuedAndExp, subscribe as subscribeTTL, formatMSS } from './ttl-ticker.js';
 import { subscribe as subscribeTrace, onStateChange, skip as skipPace } from './pace-queue.js';
+import { flipTo, currentlyFlipped, onFlipChange } from './flip-controller.js';
+import { renderBack } from './card-backs.js';
 
 const root = document.getElementById('diagram');
 if (root) renderSkeleton(root);
@@ -70,7 +72,7 @@ function renderSkeleton(host) {
   <line x1="450" y1="120" x2="450" y2="140" class="conn" id="branch-r" marker-end="url(#ar)"/>
 
   <!-- Portal X.509-SVID card -->
-  <g id="portal-card">
+  <g id="portal-rect-host" class="card-host">
     <rect x="10" y="140" width="250" height="130" class="stage-rect" id="portal-rect"/>
     <text x="22" y="160" font-size="9" font-weight="700" letter-spacing="2" class="label-idira">PORTAL · X.509-SVID</text>
     <text x="22" y="180" font-size="8" font-weight="700" letter-spacing="1.6" class="label-mute">SAN URI</text>
@@ -81,10 +83,16 @@ function renderSkeleton(host) {
     <rect x="22" y="240" width="226" height="4" fill="#16317a"/>
     <rect x="22" y="240" width="0"   height="4" fill="#265BFF" id="portal-valid-bar"/>
     <text x="22" y="262" font-size="8" class="label-idira" id="portal-rotation">—</text>
+    <foreignObject id="portal-rect-back-fo" x="10" y="140" width="250" height="130" visibility="hidden">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="card-back-host" id="portal-rect-back-host"></div>
+    </foreignObject>
+    <g class="card-caret" id="portal-rect-caret" visibility="hidden">
+      <path d="M236,148 L246,148 L246,158" stroke="var(--idira-250)" stroke-width="1" fill="none"/>
+    </g>
   </g>
 
   <!-- Carrier X.509-SVID card -->
-  <g id="carrier-card">
+  <g id="carrier-rect-host" class="card-host">
     <rect x="320" y="140" width="250" height="130" class="stage-rect" id="carrier-rect"/>
     <text x="332" y="160" font-size="9" font-weight="700" letter-spacing="2" class="label-idira">CARRIER · X.509-SVID</text>
     <text x="332" y="180" font-size="8" font-weight="700" letter-spacing="1.6" class="label-mute">SAN URI</text>
@@ -95,6 +103,12 @@ function renderSkeleton(host) {
     <rect x="332" y="240" width="226" height="4" fill="#16317a"/>
     <rect x="332" y="240" width="0"   height="4" fill="#265BFF" id="carrier-valid-bar"/>
     <text x="332" y="262" font-size="8" class="label-idira" id="carrier-rotation">—</text>
+    <foreignObject id="carrier-rect-back-fo" x="320" y="140" width="250" height="130" visibility="hidden">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="card-back-host" id="carrier-rect-back-host"></div>
+    </foreignObject>
+    <g class="card-caret" id="carrier-rect-caret" visibility="hidden">
+      <path d="M546,148 L556,148 L556,158" stroke="var(--idira-250)" stroke-width="1" fill="none"/>
+    </g>
   </g>
 
   <!-- mTLS edge -->
@@ -109,7 +123,7 @@ function renderSkeleton(host) {
   <text x="458" y="288" font-size="9" class="label-mute" id="to-jwt-label">workload-API issues</text>
 
   <!-- JWT-SVID hero -->
-  <g id="jwt-hero">
+  <g id="jwt-rect-host" class="card-host">
     <rect x="100" y="304" width="470" height="180" class="stage-rect" id="jwt-rect"/>
     <text x="116" y="328" font-size="9" font-weight="700" letter-spacing="2.2" class="label-idira" id="jwt-header">CARRIER · JWT-SVID</text>
     <text x="116" y="402" font-size="11" font-style="italic" class="label-idira" id="jwt-placeholder">issued on resolve · aud=conjur · alg=RS256 · ttl 5m</text>
@@ -128,6 +142,12 @@ function renderSkeleton(host) {
       <rect x="116" y="446" width="0"   height="6" class="ttl-bar-fill" id="jwt-ttl-bar"/>
       <text x="116" y="472" font-size="9" class="label-idira" id="jwt-jwks">signed by trust-domain JWKS</text>
     </g>
+    <foreignObject id="jwt-rect-back-fo" x="100" y="304" width="470" height="180" visibility="hidden">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="card-back-host" id="jwt-rect-back-host"></div>
+    </foreignObject>
+    <g class="card-caret" id="jwt-rect-caret" visibility="hidden">
+      <path d="M546,312 L556,312 L556,322" stroke="var(--idira-250)" stroke-width="1" fill="none"/>
+    </g>
   </g>
 
   <!-- Connector to SM block -->
@@ -135,20 +155,32 @@ function renderSkeleton(host) {
   <text x="345" y="502" font-size="9" class="label-mute" id="to-sm-label"></text>
 
   <!-- SM block -->
-  <g id="sm-block">
+  <g id="sm-rect-host" class="card-host">
     <rect x="100" y="514" width="470" height="60" class="stage-rect" id="sm-rect"/>
     <text x="116" y="538" font-size="9" font-weight="700" letter-spacing="2.2" class="label-idira" id="sm-header">SECRETS MANAGER · SAAS</text>
     <text x="116" y="558" font-size="10" font-style="italic" class="label-idira" id="sm-body">policy scoped to one variable</text>
+    <foreignObject id="sm-rect-back-fo" x="100" y="514" width="470" height="60" visibility="hidden">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="card-back-host" id="sm-rect-back-host"></div>
+    </foreignObject>
+    <g class="card-caret" id="sm-rect-caret" visibility="hidden">
+      <path d="M546,522 L556,522 L556,532" stroke="var(--idira-250)" stroke-width="1" fill="none"/>
+    </g>
   </g>
 
   <!-- Connector to Secret block -->
   <line x1="335" y1="574" x2="335" y2="604" class="conn" id="to-secret" marker-end="url(#ar)"/>
 
   <!-- Secret block -->
-  <g id="secret-block">
+  <g id="secret-rect-host" class="card-host">
     <rect x="100" y="604" width="470" height="60" class="stage-rect" id="secret-rect"/>
     <text x="116" y="628" font-size="9" font-weight="700" letter-spacing="2.2" class="label-idira" id="secret-header">SECRET</text>
     <text x="116" y="648" font-family="ui-monospace,Menlo" font-size="11" class="label-idira" id="secret-body">in-process · never on disk</text>
+    <foreignObject id="secret-rect-back-fo" x="100" y="604" width="470" height="60" visibility="hidden">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="card-back-host" id="secret-rect-back-host"></div>
+    </foreignObject>
+    <g class="card-caret" id="secret-rect-caret" visibility="hidden">
+      <path d="M546,612 L556,612 L556,622" stroke="var(--idira-250)" stroke-width="1" fill="none"/>
+    </g>
   </g>
 
   <!-- Hint -->
@@ -308,6 +340,14 @@ function setRectState(id, state) {
   if (!el) return;
   el.classList.remove('stage-rect--lit', 'stage-rect--hero', 'stage-rect--pending', 'stage-rect--err');
   if (state) el.classList.add(`stage-rect--${state}`);
+  // M6: caret + clickable-cursor visibility tied to lit / hero / err. The
+  // pending state is not flippable -- the card has no data yet to back-render.
+  // Spec docs/superpowers/specs/2026-05-29-flip-card-detail-view-design.md §7.3.
+  const clickable = state === 'lit' || state === 'hero' || state === 'err';
+  const caret = document.getElementById(id + '-caret');
+  if (caret) caret.setAttribute('visibility', clickable ? 'visible' : 'hidden');
+  const host = el.closest('g.card-host');
+  if (host) host.classList.toggle('stage-host--clickable', clickable);
 }
 
 function setConnState(id, state) {
@@ -426,3 +466,56 @@ cta?.addEventListener('click', (e) => {
     skipPace();
   }
 }, true);  // capture phase so this fires before portal.js's submit handler
+
+// === M6 flip-card wiring ===
+// Spec docs/superpowers/specs/2026-05-29-flip-card-detail-view-design.md.
+// Click handlers: only fire when the card is lit/hero/err. Cross-card flip
+// flows through flip-controller (which auto-unflips the prior). Background
+// click on the inspector pane unflips. flipChange swaps foreignObject
+// visibility at the animation midpoint (125ms of the 250ms scaleX).
+
+const CARD_IDS = ['portal-rect', 'carrier-rect', 'jwt-rect', 'sm-rect', 'secret-rect'];
+
+for (const cid of CARD_IDS) {
+  const host = document.getElementById(cid + '-host');
+  if (!host) continue;
+  host.addEventListener('click', () => {
+    const rect = document.getElementById(cid);
+    if (!rect) return;
+    const cls = rect.classList;
+    if (!cls.contains('stage-rect--lit') &&
+        !cls.contains('stage-rect--hero') &&
+        !cls.contains('stage-rect--err')) return;
+    flipTo(currentlyFlipped() === cid ? null : cid);
+  });
+}
+
+// Escape-hatch: click on inspector background (anywhere outside a card-host)
+// unflips. Listener is on the inspector pane so left-pane and chrome clicks
+// don't trigger it.
+document.querySelector('.pane--inspector')?.addEventListener('click', (e) => {
+  if (!e.target.closest('g.card-host')) flipTo(null);
+});
+
+onFlipChange((prev, next) => {
+  if (prev) {
+    const ph = document.getElementById(prev + '-host');
+    ph?.classList.remove('flipped');
+    const pfo = document.getElementById(prev + '-back-fo');
+    if (pfo) pfo.setAttribute('visibility', 'hidden');
+  }
+  if (next) {
+    // Render the back fresh from cache so the user sees the latest payload.
+    const backHost = document.getElementById(next + '-back-host');
+    if (backHost) backHost.innerHTML = renderBack(next);
+    const host = document.getElementById(next + '-host');
+    host?.classList.add('flipping');
+    setTimeout(() => host?.classList.remove('flipping'), 250);
+    // Visibility swap at the animation midpoint (125ms of the 250ms scaleX).
+    setTimeout(() => {
+      host?.classList.add('flipped');
+      const fo = document.getElementById(next + '-back-fo');
+      if (fo) fo.setAttribute('visibility', 'visible');
+    }, 125);
+  }
+});
