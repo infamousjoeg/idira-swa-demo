@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	"encoding/base64"
 	"encoding/json"
 	"io/fs"
 	"net/http"
@@ -30,6 +31,28 @@ type handlerDeps struct {
 	secretID string
 	bus      *TraceBus
 	now      func() time.Time
+	algKid   func(token string) (alg, kid string) // injectable for tests; defaults to parseJWTHeader
+}
+
+// parseJWTHeader extracts alg and kid from a compact JWT's first segment.
+// Returns ("", "") on any parse failure — emit-side falls back gracefully.
+func parseJWTHeader(token string) (alg, kid string) {
+	parts := strings.SplitN(token, ".", 3)
+	if len(parts) < 2 {
+		return "", ""
+	}
+	hdrJSON, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return "", ""
+	}
+	var h struct {
+		Alg string `json:"alg"`
+		Kid string `json:"kid"`
+	}
+	if err := json.Unmarshal(hdrJSON, &h); err != nil {
+		return "", ""
+	}
+	return h.Alg, h.Kid
 }
 
 // Fixture data lives in apps/carrier/fixture/. Loaded once on first use.
@@ -72,9 +95,19 @@ func handleLookup(d handlerDeps) http.HandlerFunc {
 			http.Error(w, "agent unreachable", http.StatusBadGateway)
 			return
 		}
+		algFn := d.algKid
+		if algFn == nil {
+			algFn = parseJWTHeader
+		}
+		alg, kid := algFn(svid.Marshal())
 		d.bus.Emit(traceEvent{Source: "carrier", Type: "jwt_svid.issued",
-			Payload: map[string]any{"aud": "conjur", "exp": svid.Expiry.Unix(),
-				"spiffe_id": svid.ID.String()}})
+			Payload: map[string]any{
+				"aud":       "conjur",
+				"exp":       svid.Expiry.Unix(),
+				"spiffe_id": svid.ID.String(),
+				"alg":       alg,
+				"kid":       kid,
+			}})
 
 		smTok, err := d.sm.AuthnJWT(ctx, svid.Marshal())
 		if err != nil {

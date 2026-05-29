@@ -81,6 +81,7 @@ func run() error {
 		secretID: secretID,
 		bus:      bus,
 		now:      time.Now,
+		algKid:   parseJWTHeader,
 	}
 
 	mux := http.NewServeMux()

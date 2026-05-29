@@ -58,6 +58,7 @@ func newTestDeps(t *testing.T, sm smAPI, jwtErr, smErr error) handlerDeps {
 		secretID: "swa-demo/carrier/api-key",
 		bus:      bus,
 		now:      func() time.Time { return time.Unix(1748000000, 0) },
+		algKid:   func(string) (string, string) { return "RS256", "stub-kid" },
 	}
 }
 
@@ -165,4 +166,56 @@ func typesOf(evs []traceEvent) []string {
 		out = append(out, e.Type)
 	}
 	return out
+}
+
+func TestLookup_EmitsAlgAndKid(t *testing.T) {
+	bus := NewTraceBus(64)
+	deps := newTestDeps(t, &stubSM{authnToken: "tok", secret: []byte("api-key")}, nil, nil)
+	deps.bus = bus
+
+	sub := bus.Subscribe()
+	defer bus.Unsubscribe(sub)
+
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/lookup/SHP-2049-883", nil)
+		handleLookup(deps)(httptest.NewRecorder(), req)
+	}()
+
+	// Collect events until we see jwt_svid.issued or time out.
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case ev := <-sub:
+			if ev.Type != "jwt_svid.issued" {
+				continue
+			}
+			alg, _ := ev.Payload["alg"].(string)
+			kid, _ := ev.Payload["kid"].(string)
+			if alg == "" {
+				t.Fatalf("jwt_svid.issued missing alg; payload=%v", ev.Payload)
+			}
+			if kid == "" {
+				t.Fatalf("jwt_svid.issued missing kid; payload=%v", ev.Payload)
+			}
+			return
+		case <-timeout:
+			t.Fatal("never saw jwt_svid.issued")
+		}
+	}
+}
+
+func TestParseJWTHeader_KnownToken(t *testing.T) {
+	// Hand-crafted: header={"alg":"RS256","kid":"abc123"} base64url, body and sig are dummies.
+	tok := "eyJhbGciOiJSUzI1NiIsImtpZCI6ImFiYzEyMyJ9.eyJzdWIiOiJ4In0.sig"
+	alg, kid := parseJWTHeader(tok)
+	if alg != "RS256" || kid != "abc123" {
+		t.Errorf("alg=%q kid=%q", alg, kid)
+	}
+}
+
+func TestParseJWTHeader_Garbage(t *testing.T) {
+	alg, kid := parseJWTHeader("not-a-jwt")
+	if alg != "" || kid != "" {
+		t.Errorf("expected empty; got alg=%q kid=%q", alg, kid)
+	}
 }
