@@ -118,3 +118,66 @@ test('unknown shipment surfaces not-found, does NOT crash UI', async ({ page }) 
   await page.click('button.cta');
   await expect(page.locator('.result__row .result__v').first()).toHaveText(/not found/i, { timeout: 5000 });
 });
+
+test('ttl counts down live and stays in sync between panes', async ({ page }) => {
+  await page.goto('/');
+  await page.fill('input[name="shipment_id"]', 'SHP-2049-883');
+  await page.click('button.cta');
+  await expect(page.locator('#evidence-ttl')).toHaveText(/^\d+m \d{2}s$/, { timeout: 5000 });
+
+  const t0Right = await page.locator('#jwt-ttl').textContent();
+  const t0Left  = await page.locator('#evidence-ttl').textContent();
+  // Same value (within 1 s) at the same instant — they share a ticker.
+  expect(t0Right).toBe(t0Left);
+
+  await page.waitForTimeout(2200);
+
+  const t1Right = await page.locator('#jwt-ttl').textContent();
+  // Strictly less after >2s.
+  expect(secondsOf(t1Right!)).toBeLessThan(secondsOf(t0Right!));
+});
+
+test('no AI-generation markers in diagram or evidence', async ({ page }) => {
+  await page.goto('/');
+  await page.fill('input[name="shipment_id"]', 'SHP-2049-883');
+  await page.click('button.cta');
+  await expect(page.locator('#evidence')).toBeVisible({ timeout: 5000 });
+
+  // No emoji codepoints anywhere in rendered text.
+  const text = await page.evaluate(() => document.body.innerText);
+  // eslint-disable-next-line no-misleading-character-class
+  expect(text).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
+
+  // No purple/pink hues in computed styles of diagram or evidence elements.
+  const hues = await page.evaluate(() => {
+    const els = [
+      ...document.querySelectorAll('#diagram *'),
+      ...document.querySelectorAll('#evidence, #evidence *'),
+    ];
+    return els.map(el => {
+      const s = getComputedStyle(el);
+      return [s.color, s.fill, s.stroke, s.backgroundColor, s.borderColor].join(' ');
+    }).join(' ');
+  });
+  expect(hues).not.toMatch(/rgb\(\s*(?:1[5-9][0-9]|2[0-4][0-9])\s*,\s*[0-9]{1,2}\s*,\s*(?:1[5-9][0-9]|2[0-4][0-9])/);
+  // (Heuristic: matches purple/magenta R,G,B where R high, G low, B high.)
+
+  // No border-radius > 0 inside #diagram and #evidence.
+  const radii = await page.evaluate(() => {
+    const els = [
+      ...document.querySelectorAll('#diagram *'),
+      ...document.querySelectorAll('#evidence, #evidence *'),
+    ];
+    return els.map(el => getComputedStyle(el).borderRadius);
+  });
+  for (const r of radii) {
+    expect(r === '0px' || r === '').toBeTruthy();
+  }
+});
+
+function secondsOf(mss: string): number {
+  // "4m 58s" → 298
+  const m = mss.match(/(\d+)m\s+(\d+)s/);
+  if (!m) return -1;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
