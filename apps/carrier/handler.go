@@ -178,7 +178,7 @@ func handleLookup(d handlerDeps) http.HandlerFunc {
 				"token_len":         len(smTok),
 			}})
 
-		secret, _, err := d.sm.FetchSecret(ctx, smTok, d.secretID)
+		secret, secretMeta, err := d.sm.FetchSecret(ctx, smTok, d.secretID)
 		if err != nil {
 			d.bus.Emit(traceEvent{Source: "carrier", Type: "sm.secret_fetched.err",
 				Payload: map[string]any{"err": err.Error()}})
@@ -190,10 +190,19 @@ func handleLookup(d handlerDeps) http.HandlerFunc {
 			http.Error(w, "empty secret", http.StatusBadGateway)
 			return
 		}
-		// Metadata is captured but not yet emitted here -- Task 6 wires the
-		// full sm.secret_fetched.ok payload with no-leak metadata.
+		// NO-LEAK DISCIPLINE: only the byte COUNT (len) is emitted; the secret
+		// value itself is never placed in any payload field. Spec §6.2 +
+		// validator §13.4 #4. Enforced by TestEmitSMSecretFetchedOK_NeverContainsSecretValue.
 		d.bus.Emit(traceEvent{Source: "carrier", Type: "sm.secret_fetched.ok",
-			Payload: map[string]any{"bytes": len(secret)}})
+			Payload: map[string]any{
+				"url":          secretMeta.URL,
+				"method":       secretMeta.Method,
+				"status":       secretMeta.Status,
+				"secret_id":    secretMeta.SecretID,
+				"version":      secretMeta.Version,
+				"policy_scope": secretMeta.PolicyScope,
+				"bytes":        len(secret),
+			}})
 
 		row, ok := fixtures[id]
 		if !ok {

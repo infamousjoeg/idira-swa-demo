@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
@@ -227,6 +228,55 @@ func TestLookup_EmitsAlgAndKid(t *testing.T) {
 			return
 		case <-timeout:
 			t.Fatal("never saw jwt_svid.issued")
+		}
+	}
+}
+
+// TestEmitSMSecretFetchedOK_NeverContainsSecretValue asserts the no-leak
+// discipline on the secret-fetch event: no field of the emitted payload may
+// contain the actual secret bytes. The byte count is allowed (and required).
+// Spec §6.2 + validator §13.4 #4.
+func TestEmitSMSecretFetchedOK_NeverContainsSecretValue(t *testing.T) {
+	secretValue := []byte("SUPER-SECRET-API-KEY-DO-NOT-LEAK")
+	bus := NewTraceBus(64)
+	deps := newTestDeps(t, &stubSM{authnToken: "tok", secret: secretValue}, nil, nil)
+	deps.bus = bus
+
+	sub := bus.Subscribe()
+	defer bus.Unsubscribe(sub)
+
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/lookup/SHP-2049-883", nil)
+		handleLookup(deps)(httptest.NewRecorder(), req)
+	}()
+
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case ev := <-sub:
+			if ev.Type != "sm.secret_fetched.ok" {
+				continue
+			}
+			for k, v := range ev.Payload {
+				if sv, ok := v.(string); ok && strings.Contains(sv, string(secretValue)) {
+					t.Fatalf("field %q leaked secret value (%q)", k, sv)
+				}
+				if bv, ok := v.([]byte); ok && bytes.Contains(bv, secretValue) {
+					t.Fatalf("field %q leaked secret bytes", k)
+				}
+			}
+			// Required metadata fields must all be present.
+			for _, k := range []string{"url", "method", "status", "secret_id", "version", "policy_scope", "bytes"} {
+				if _, ok := ev.Payload[k]; !ok {
+					t.Errorf("sm.secret_fetched.ok payload missing key %q", k)
+				}
+			}
+			if got := ev.Payload["bytes"]; got != len(secretValue) {
+				t.Errorf("bytes=%v, want %d", got, len(secretValue))
+			}
+			return
+		case <-timeout:
+			t.Fatal("never saw sm.secret_fetched.ok")
 		}
 	}
 }
