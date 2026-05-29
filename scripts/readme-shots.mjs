@@ -4,7 +4,8 @@
 //   - kubectl port-forward svc/portal 18080:8080 (the Makefile target arranges this)
 //   - The portal Deployment has the current M5 UI (build-apps + deploy-apps).
 //
-// Output: docs/img/portal-empty.png, portal-resolved.png, portal-walking.png
+// Output: docs/img/portal-empty.png, portal-walking.png, portal-resolved.png,
+//         portal-flipped-jwt.png (M6: JWT-SVID hero card flipped open)
 
 import { mkdir } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
@@ -76,6 +77,24 @@ async function main() {
   await page.waitForTimeout(1100);
   await page.screenshot({ path: resolve(OUT_DIR, 'portal-resolved.png'), fullPage: true });
   console.log('wrote', resolve(OUT_DIR, 'portal-resolved.png'));
+
+  // 4) Flipped JWT-SVID hero: resolve + click the JWT card. Spec M6 §10.
+  await page.goto(`${BASE}/?pace=off`);
+  await page.waitForSelector('#diagram svg');
+  await page.waitForFunction(() => {
+    const v = document.getElementById('td-val')?.textContent || '';
+    return v && v !== '—';
+  }, { timeout: 10000 });
+  await page.fill('input[name="shipment_id"]', 'SHP-2049-883');
+  await page.click('button.cta');
+  await page.waitForSelector('#jwt-rect.stage-rect--hero', { timeout: 5000 });
+  await page.click('#jwt-rect-host');
+  await page.waitForFunction(() =>
+    document.getElementById('jwt-rect-back-fo')?.getAttribute('visibility') === 'visible',
+    { timeout: 1500 });
+  await page.waitForTimeout(300);  // let the 250ms scale-flip settle
+  await page.screenshot({ path: resolve(OUT_DIR, 'portal-flipped-jwt.png'), fullPage: true });
+  console.log('wrote', resolve(OUT_DIR, 'portal-flipped-jwt.png'));
 
   await browser.close();
 }
