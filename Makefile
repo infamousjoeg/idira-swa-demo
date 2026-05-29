@@ -202,11 +202,20 @@ smoke-m2: ## Run M2 acceptance check
 up-m2: up-m1 build-apps deploy-apps tf-apply-app smoke-m2 ## Full M2 deploy + smoketest
 	@echo 'M2 ready.'
 
-.PHONY: portforward smoke-m3 up smoke
+.PHONY: portforward smoke-m3 up smoke readme-shots
 
 portforward: ## Forward portal :8080 to localhost (blocks)
 	@echo 'Portal at http://localhost:8080 — Ctrl+C to stop'
 	kubectl -n swa-demo port-forward svc/portal 8080:8080
+
+readme-shots: ## Capture docs/img/*.png from a live portal (uses :18080)
+	@echo 'Capturing README images...'
+	@# Use a non-8080 local port to avoid the user's dev proxy.
+	@kubectl -n swa-demo port-forward svc/portal 18080:8080 >/dev/null 2>&1 & \
+	pf_pid=$$!; \
+	trap "kill $$pf_pid >/dev/null 2>&1 || true" EXIT; \
+	sleep 2; \
+	cd ui-tests && node ../scripts/readme-shots.mjs
 
 smoke-m3: ## Run M3 acceptance check (headless browser)
 	@./scripts/smoke-ui.sh
