@@ -55,6 +55,45 @@ func parseJWTHeader(token string) (alg, kid string) {
 	return h.Alg, h.Kid
 }
 
+// decodeJWTClaims base64url-decodes the body segment of a compact JWT and
+// returns the parsed JSON object. Used to extract iss/iat/jti for the M6
+// jwt_svid.issued payload extension. Returns nil on any parse failure.
+func decodeJWTClaims(token string) map[string]any {
+	parts := strings.SplitN(token, ".", 3)
+	if len(parts) < 2 {
+		return nil
+	}
+	body, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil
+	}
+	var out map[string]any
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil
+	}
+	return out
+}
+
+// parseJWTType reads the JOSE header's "typ" field. Returns "" on any parse
+// failure; callers should fall back to "JWT" when displaying.
+func parseJWTType(token string) string {
+	parts := strings.SplitN(token, ".", 3)
+	if len(parts) < 2 {
+		return ""
+	}
+	hdr, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return ""
+	}
+	var h struct {
+		Typ string `json:"typ"`
+	}
+	if err := json.Unmarshal(hdr, &h); err != nil {
+		return ""
+	}
+	return h.Typ
+}
+
 // Fixture data lives in apps/carrier/fixture/. Loaded once on first use.
 var (
 	fixturesOnce sync.Once
@@ -100,6 +139,9 @@ func handleLookup(d handlerDeps) http.HandlerFunc {
 			algFn = parseJWTHeader
 		}
 		alg, kid := algFn(svid.Marshal())
+		raw := svid.Marshal()
+		claims := decodeJWTClaims(raw)
+		typ := parseJWTType(raw)
 		d.bus.Emit(traceEvent{Source: "carrier", Type: "jwt_svid.issued",
 			Payload: map[string]any{
 				"aud":       "conjur",
@@ -107,6 +149,11 @@ func handleLookup(d handlerDeps) http.HandlerFunc {
 				"spiffe_id": svid.ID.String(),
 				"alg":       alg,
 				"kid":       kid,
+				"iss":       claims["iss"],
+				"iat":       claims["iat"],
+				"jti":       claims["jti"],
+				"typ":       typ,
+				"raw":       raw,
 			}})
 
 		smTok, err := d.sm.AuthnJWT(ctx, svid.Marshal())

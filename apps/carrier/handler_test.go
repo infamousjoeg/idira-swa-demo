@@ -204,6 +204,67 @@ func TestLookup_EmitsAlgAndKid(t *testing.T) {
 	}
 }
 
+// TestEmitJWTSvidIssued_IncludesFullClaims asserts the M6 payload extension:
+// the emitted jwt_svid.issued event must carry iss, iat, jti, typ, and raw on
+// top of the M3-era aud/exp/spiffe_id/alg/kid. Spec §5 of the 2026-05-29
+// flip-card-detail-view design + plan Task 2. Only key PRESENCE is checked
+// here -- the stub SVID's Marshal() returns "" so the decode helpers will
+// produce nil values; that's fine because we only want to fail loud when a
+// key is missing from the map.
+func TestEmitJWTSvidIssued_IncludesFullClaims(t *testing.T) {
+	bus := NewTraceBus(64)
+	deps := newTestDeps(t, &stubSM{authnToken: "tok", secret: []byte("api-key")}, nil, nil)
+	deps.bus = bus
+
+	sub := bus.Subscribe()
+	defer bus.Unsubscribe(sub)
+
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/lookup/SHP-2049-883", nil)
+		handleLookup(deps)(httptest.NewRecorder(), req)
+	}()
+
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case ev := <-sub:
+			if ev.Type != "jwt_svid.issued" {
+				continue
+			}
+			for _, k := range []string{"aud", "exp", "spiffe_id", "alg", "kid", "iss", "iat", "jti", "typ", "raw"} {
+				if _, ok := ev.Payload[k]; !ok {
+					t.Errorf("jwt_svid.issued payload missing key %q", k)
+				}
+			}
+			return
+		case <-timeout:
+			t.Fatal("never saw jwt_svid.issued")
+		}
+	}
+}
+
+// TestDecodeJWTClaims_KnownToken asserts the decode helper round-trips a
+// known JWT body segment correctly. Plan Task 2 helper coverage.
+func TestDecodeJWTClaims_KnownToken(t *testing.T) {
+	// header={"alg":"RS256"}, body={"iss":"swa-server","iat":1748000000,"jti":"abc"}, sig=dummy
+	tok := "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJzd2Etc2VydmVyIiwiaWF0IjoxNzQ4MDAwMDAwLCJqdGkiOiJhYmMifQ.sig"
+	claims := decodeJWTClaims(tok)
+	if claims["iss"] != "swa-server" {
+		t.Errorf("iss=%v", claims["iss"])
+	}
+	if claims["jti"] != "abc" {
+		t.Errorf("jti=%v", claims["jti"])
+	}
+}
+
+func TestParseJWTType_DefaultJWT(t *testing.T) {
+	// header={"alg":"RS256","typ":"JWT"}
+	tok := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.body.sig"
+	if got := parseJWTType(tok); got != "JWT" {
+		t.Errorf("typ=%q", got)
+	}
+}
+
 func TestParseJWTHeader_KnownToken(t *testing.T) {
 	// Hand-crafted: header={"alg":"RS256","kid":"abc123"} base64url, body and sig are dummies.
 	tok := "eyJhbGciOiJSUzI1NiIsImtpZCI6ImFiYzEyMyJ9.eyJzdWIiOiJ4In0.sig"
