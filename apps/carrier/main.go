@@ -105,6 +105,7 @@ func run() error {
 	// uses HTTPS in M3 and accepts the cert it can validate against the bundle).
 	traceMux := http.NewServeMux()
 	traceMux.HandleFunc("/trace", handleTraceSSE(bus))
+	traceMux.HandleFunc("/identity", handleIdentity(src))
 	traceSrv := &http.Server{
 		Addr:              ":8444",
 		Handler:           traceMux,
@@ -128,7 +129,7 @@ func run() error {
 		"sm_url": smURL, "secret_id": secretID,
 		"portal_spiffe": portalSPIFFE,
 	}})
-	log.Printf("carrier: mTLS on %s (trace %s), socket=%s, sm=%s, secret=%s, peer=%s",
+	log.Printf("carrier: mTLS on %s (trace + identity on %s), socket=%s, sm=%s, secret=%s, peer=%s",
 		srv.Addr, traceSrv.Addr, socketPath, smURL, secretID, portalSPIFFE)
 	// Empty cert/key args are correct — certs come from TLSConfig.GetCertificate.
 	if err := srv.ListenAndServeTLS("", ""); err != nil && !errors.Is(err, http.ErrServerClosed) {
