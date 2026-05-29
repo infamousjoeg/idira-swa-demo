@@ -231,6 +231,57 @@ func TestLookup_EmitsAlgAndKid(t *testing.T) {
 	}
 }
 
+// TestEmitSMAuthnJWTOK_RedactsBearer asserts that no field of the emitted
+// sm.authn_jwt.ok payload contains the full bearer token: only token_redacted
+// is allowed to surface it (and only as the safe display form). The redaction
+// is enforced at the Go wire-emission boundary in handler.go via redactBearer;
+// the frontend never sees the full token. Spec §6.2 + validator §13.4 #4.
+func TestEmitSMAuthnJWTOK_RedactsBearer(t *testing.T) {
+	// Realistic-looking bearer: long enough that a regex scan in the smoke
+	// test (Task 12) would catch any unredacted leakage.
+	fullToken := "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJob3N0L3N3YS1kZW1vL2NhcnJpZXIiLCJpYXQiOjE3NDgwMDAwMDAsImV4cCI6MTc0ODAwMDQ4MH0.LONGFAKESIGNATUREFAKESIGNATURE"
+	bus := NewTraceBus(64)
+	deps := newTestDeps(t, &stubSM{authnToken: fullToken, secret: []byte("api-key")}, nil, nil)
+	deps.bus = bus
+
+	sub := bus.Subscribe()
+	defer bus.Unsubscribe(sub)
+
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/lookup/SHP-2049-883", nil)
+		handleLookup(deps)(httptest.NewRecorder(), req)
+	}()
+
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case ev := <-sub:
+			if ev.Type != "sm.authn_jwt.ok" {
+				continue
+			}
+			redacted, _ := ev.Payload["token_redacted"].(string)
+			if !strings.HasSuffix(redacted, "…REDACTED") {
+				t.Errorf("token_redacted missing …REDACTED marker: %q", redacted)
+			}
+			// Critical: full token must NOT appear in any payload field.
+			for k, v := range ev.Payload {
+				if sv, ok := v.(string); ok && strings.Contains(sv, fullToken) {
+					t.Fatalf("field %q leaked full bearer", k)
+				}
+			}
+			// The required metadata fields must all be present.
+			for _, k := range []string{"url", "method", "status", "token_redacted", "token_ttl_seconds", "scope"} {
+				if _, ok := ev.Payload[k]; !ok {
+					t.Errorf("sm.authn_jwt.ok payload missing key %q", k)
+				}
+			}
+			return
+		case <-timeout:
+			t.Fatal("never saw sm.authn_jwt.ok")
+		}
+	}
+}
+
 // TestEmitJWTSvidIssued_IncludesFullClaims asserts the M6 payload extension:
 // the emitted jwt_svid.issued event must carry iss, iat, jti, typ, and raw on
 // top of the M3-era aud/exp/spiffe_id/alg/kid. Spec §5 of the 2026-05-29

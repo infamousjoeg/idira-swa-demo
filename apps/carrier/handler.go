@@ -156,17 +156,27 @@ func handleLookup(d handlerDeps) http.HandlerFunc {
 				"raw":       raw,
 			}})
 
-		smTok, _, err := d.sm.AuthnJWT(ctx, svid.Marshal())
+		smTok, smMeta, err := d.sm.AuthnJWT(ctx, svid.Marshal())
 		if err != nil {
 			d.bus.Emit(traceEvent{Source: "carrier", Type: "sm.authn_jwt.err",
 				Payload: map[string]any{"err": err.Error()}})
 			http.Error(w, "identity rejected", http.StatusBadGateway)
 			return
 		}
-		// Metadata is captured but not yet emitted here -- Task 5 wires the
-		// full sm.authn_jwt.ok payload with redacted bearer + meta fields.
+		// REDACTION DISCIPLINE: the full bearer token (smTok) is NEVER emitted.
+		// Only redactBearer(smTok) reaches the trace bus. Spec §6.2 + validator
+		// §13.4 #4. token_len is kept for backward compat with the M5 evidence
+		// wiring that reads it for the trust-card byte count.
 		d.bus.Emit(traceEvent{Source: "carrier", Type: "sm.authn_jwt.ok",
-			Payload: map[string]any{"token_len": len(smTok)}})
+			Payload: map[string]any{
+				"url":               smMeta.URL,
+				"method":            smMeta.Method,
+				"status":            smMeta.Status,
+				"token_redacted":    redactBearer(smTok),
+				"token_ttl_seconds": smMeta.TokenTTLSeconds,
+				"scope":             smMeta.Scope,
+				"token_len":         len(smTok),
+			}})
 
 		secret, _, err := d.sm.FetchSecret(ctx, smTok, d.secretID)
 		if err != nil {
