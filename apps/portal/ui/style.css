@@ -147,6 +147,8 @@ body {
 .inspector__head {
   display: flex; flex-direction: column; gap: 4px; margin-bottom: 24px;
   padding-bottom: 16px; border-bottom: 1px solid #16192a;
+  /* The pace control becomes the third child; let it align right below the eyebrow row. */
+  position: relative;
 }
 .inspector__eyebrow {
   font: 700 10px/1 var(--font-body);
@@ -252,3 +254,31 @@ body {
 }
 .evidence--dim { color: var(--text-mute); }
 .evidence--dim b { color: var(--text-mute); }
+
+/* === M5 pacing toggle (chrome over the inspector pane) === */
+.pace-control {
+  display: flex; align-items: baseline; gap: 10px;
+  margin-top: 4px;
+}
+.pace-control__eyebrow {
+  font: 700 9px/1 var(--font-body);
+  letter-spacing: 0.22em;
+  color: var(--idira-250);
+}
+.pace-control__opt {
+  appearance: none;
+  background: transparent;
+  border: 0; border-bottom: 1px solid transparent;
+  border-radius: 0;
+  padding: 0 0 1px;
+  margin: 0;
+  font: 500 10px/1 var(--font-mono);
+  color: var(--text-mute);
+  cursor: pointer;
+  transition: color 100ms ease-out;
+}
+.pace-control__opt:hover { color: #FFFFFF; }
+.pace-control__opt--active {
+  color: #FFFFFF;
+  border-bottom: 1px solid var(--idira-500);
+}
