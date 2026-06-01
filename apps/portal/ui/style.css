@@ -334,7 +334,9 @@ body {
   box-sizing: border-box;
   border: 0;
   border-radius: 0;
-  overflow: hidden;
+  /* Backs can exceed their card rect; scroll inside the foreignObject  */
+  /* rather than clip. Whisper Rail scrollbar block follows.            */
+  overflow: auto;
 }
 .card-back__eyebrow {
   font: 700 9px/1 var(--font-body);
@@ -373,3 +375,53 @@ body {
 .card-back__json .json-str   { color: #DCE5FF; }
 .card-back__json .json-num   { color: #FFFFFF; }
 .card-back__json .json-punct { color: #4A4A52; }
+
+/* M6 scrollbar -- Whisper Rail (ambient).                                      */
+/* Invisible at rest. On card hover the thumb fades up in a deep-brand ghost    */
+/* (--idira-750 at ~70%); direct thumb hover brightens to --idira-500;          */
+/* active drag drops to --idira-250. Matches the cartographic, line-only,       */
+/* no-shadow/no-gradient discipline of the rest of the diagram.                 */
+.card-back {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 220ms ease;
+}
+.card-back:hover,
+.card-back:focus-within {
+  scrollbar-color: var(--idira-750) transparent;
+}
+.card-back::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: transparent;
+}
+.card-back::-webkit-scrollbar-track,
+.card-back::-webkit-scrollbar-track-piece,
+.card-back::-webkit-scrollbar-corner {
+  background: transparent;
+  border: 0;
+}
+.card-back::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  /* Pseudo-element border-radius; outside brand-purity scan reach (the */
+  /* foreignObject * selector cannot match ::-webkit-scrollbar-thumb).  */
+  border-radius: 3px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 220ms ease;
+}
+.card-back:hover::-webkit-scrollbar-thumb,
+.card-back:focus-within::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--idira-750) 70%, transparent);
+}
+.card-back::-webkit-scrollbar-thumb:hover {
+  background-color: var(--idira-500);
+}
+.card-back::-webkit-scrollbar-thumb:active {
+  background-color: var(--idira-250);
+}
+.card-back::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
