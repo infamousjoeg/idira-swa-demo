@@ -32,8 +32,8 @@ async function loadIdentity() {
 }
 
 function renderSkeleton(host) {
-  // Coordinates pulled directly from spec §5.1 / Frame 1 mockup. Keep this
-  // SVG hand-authored — no string templating, no D3 — so the structure is
+  // Coordinates pulled directly from the Frame 1 mockup. Keep this SVG
+  // hand-authored -- no string templating, no D3 -- so the structure is
   // greppable when something looks wrong.
   host.innerHTML = `
 <svg viewBox="0 0 580 720" xmlns="http://www.w3.org/2000/svg" aria-label="SPIFFE trust diagram">
@@ -340,9 +340,8 @@ function setRectState(id, state) {
   if (!el) return;
   el.classList.remove('stage-rect--lit', 'stage-rect--hero', 'stage-rect--pending', 'stage-rect--err');
   if (state) el.classList.add(`stage-rect--${state}`);
-  // M6: caret + clickable-cursor visibility tied to lit / hero / err. The
-  // pending state is not flippable -- the card has no data yet to back-render.
-  // Spec docs/superpowers/specs/2026-05-29-flip-card-detail-view-design.md §7.3.
+  // Caret + clickable-cursor visibility tied to lit / hero / err states. The
+  // pending state is not flippable: the card has no data yet to back-render.
   const clickable = state === 'lit' || state === 'hero' || state === 'err';
   const caret = document.getElementById(id + '-caret');
   if (caret) caret.setAttribute('visibility', clickable ? 'visible' : 'hidden');
@@ -467,8 +466,7 @@ cta?.addEventListener('click', (e) => {
   }
 }, true);  // capture phase so this fires before portal.js's submit handler
 
-// === M6 flip-card wiring ===
-// Spec docs/superpowers/specs/2026-05-29-flip-card-detail-view-design.md.
+// === Flip-card wiring ===
 // Click handlers: only fire when the card is lit/hero/err. Cross-card flip
 // flows through flip-controller (which auto-unflips the prior). Background
 // click on the inspector pane unflips. flipChange swaps foreignObject

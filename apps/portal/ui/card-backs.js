@@ -1,17 +1,15 @@
 // card-backs.js -- per-card-type back-content renderers. Returns HTML
 // strings; diagram.js injects them into each card's <foreignObject> child
-// div via innerHTML. Spec docs/superpowers/specs/2026-05-29-flip-card-detail-
-// view-design.md §6.1 (back content) and §7.4 (visual style).
+// div via innerHTML.
 //
 // Conventions:
 //   - All dynamic text MUST go through escapeHTML(). The JSON formatter
 //     handles escaping internally so its output is safe to interpolate.
-//   - Err-state renderers (per spec §8.1) are selected by inspecting cached
-//     error payloads alongside the happy-path payload; if an err payload is
-//     present and more recent (or the happy-path is absent), the err view
-//     wins.
-//   - Empty-cache fallback (per spec §8.2) renders a minimal "no data"
-//     eyebrow so the back never appears blank.
+//   - Err-state renderers are selected by inspecting cached error payloads
+//     alongside the happy-path payload; if an err payload is present and
+//     more recent (or the happy-path is absent), the err view wins.
+//   - Empty-cache fallback renders a minimal "no data" eyebrow so the
+//     back never appears blank.
 
 import { cachedEvent, cachedIdentity } from './flip-controller.js';
 
@@ -29,7 +27,8 @@ function row(k, v) {
 // formatJSON -- lightweight syntax coloring for a JSON.stringify output.
 // Regex-based class spans; relies on escapeHTML having already neutralized
 // any HTML in string values (we do it inline here against the stringified
-// JSON). Spec §7.4 (json-key / json-str / json-num / json-punct classes).
+// JSON). Emits json-key / json-str / json-num / json-punct class spans
+// for the stylesheet to color.
 function formatJSON(obj) {
   if (obj == null) return '';
   const str = JSON.stringify(obj, null, 2);
@@ -41,7 +40,7 @@ function formatJSON(obj) {
     .replace(/([{}\[\],])/g, '<span class="json-punct">$1</span>');
 }
 
-// emptyBack -- spec §8.2 fallback.
+// emptyBack -- minimal "awaiting resolve" fallback when no payload is cached.
 function emptyBack(eyebrow) {
   return `<div class="card-back">
     <div class="card-back__eyebrow">${escapeHTML(eyebrow)}</div>
@@ -49,7 +48,7 @@ function emptyBack(eyebrow) {
   </div>`;
 }
 
-// errBack -- spec §8.1 err-state renderer (shared shape across cards).
+// errBack -- shared err-state renderer (same shape across all cards).
 function errBack(eyebrow, errPayload, atHint) {
   return `<div class="card-back">
     <div class="card-back__eyebrow">${escapeHTML(eyebrow)}</div>

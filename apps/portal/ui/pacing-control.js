@@ -1,4 +1,4 @@
-// pacing-control.js — chrome toggle UI for pace selection. Spec §7.
+// pacing-control.js -- chrome toggle UI for pace selection (off/fast/medium/slow).
 
 import { setPace } from './pace-queue.js';
 
@@ -27,8 +27,9 @@ function resolveInitial() {
   return { key: DEFAULT_KEY, fromURL: false };
 }
 
-// Map any incoming string to a known option key. Numeric strings stay as their
-// number value (escape hatch from spec §7.1). Unknown values fall back to default.
+// Map any incoming string to a known option key. Numeric strings stay as
+// their number value (escape hatch for raw ms tuning). Unknown values fall
+// back to default.
 function normalize(raw) {
   const lower = String(raw).toLowerCase();
   if (OPTIONS.some(o => o.key === lower)) return lower;

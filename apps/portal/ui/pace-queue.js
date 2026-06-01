@@ -1,10 +1,11 @@
-// pace-queue.js — single owner of the /trace EventSource. Holds incoming
+// pace-queue.js -- single owner of the /trace EventSource. Holds incoming
 // events in a FIFO and drains them through subscribers at a configurable
-// cadence with per-event-type weights. Spec: docs/superpowers/specs/
-// 2026-05-29-diagram-pacing-design.md §5-6.
+// cadence with per-event-type weights, so the diagram animates over a
+// presenter-friendly window instead of flashing through every event in
+// the time the backend takes to resolve.
 
 // Stage weights: multiplier on the base pace unit per event type.
-// Spec §6.1. JWT-SVID issuance is the climax; mTLS setup is brief.
+// JWT-SVID issuance is the climax (longest dwell); mTLS setup is brief.
 const STAGE_WEIGHTS = {
   'portal.resolve.requested': 1.0,
   'mtls.handshake.start':     0.7,

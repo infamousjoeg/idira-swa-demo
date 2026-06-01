@@ -1,7 +1,5 @@
 // flip-controller.js -- single owner of "which card is flipped" + event
-// payload cache for the card backs. Spec docs/superpowers/specs/
-// 2026-05-29-flip-card-detail-view-design.md §5 (state model) and §6.3
-// (cache contract). Mounted in diagram.js (Task 9).
+// payload cache for the card backs. Mounted in diagram.js.
 //
 // Architectural contract:
 //   - At most ONE card may be flipped at a time. flipTo(id) handles the
@@ -9,8 +7,8 @@
 //   - The event-payload cache is hydrated from the pace-queue stream so card
 //     backs render zero-latency from the most recent payload of each type.
 //   - portal.resolve.requested both clears the (non-identity) cache and
-//     unflips any currently-open card. §7.3 of the spec: a new walk implies
-//     the stale back content for the prior walk would lie about the next.
+//     unflips any currently-open card. A new walk implies the stale back
+//     content for the prior walk would lie about the next.
 //   - The /identity fetch is one-shot on module load -- it's the source of
 //     truth for the two X.509 card backs and changes only on cert rotation.
 
@@ -31,7 +29,7 @@ let currentFlipped = null;     // card id (e.g., 'jwt-rect') or null
 const flipSubs = new Set();    // notified on flip change (renderers)
 
 // Hydrate the cache from the pace-queue stream. Also clear non-identity
-// cache + unflip on a new resolve, per spec §7.3.
+// cache + unflip on a new resolve so the back never reflects stale data.
 subscribe((ev) => {
   if (ev.type === 'portal.resolve.requested') {
     for (const k of Object.keys(cache)) {
