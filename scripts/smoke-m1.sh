@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# smoke-m1.sh — M1 acceptance check (spec §14.1).
+# smoke-m1.sh -- M1 acceptance check.
 # Hard fails on any deviation. Exit 0 = PASS, exit non-zero = FAIL.
 #
-# Deviations from the plan's draft script (preserved here so the validator
-# can diff against the plan):
+# Notes on the signals chosen (these caught us off guard during bring-up
+# and are easy to second-guess later):
 #
 #   1. Server-auth signal is `msg=ServerCaBundleUploaded subsystem=controlplane`,
 #      NOT `successfully authenticat` (the bundled server never logs that
@@ -47,7 +47,7 @@ err()  { printf '  [FAIL] %s\n' "$*"; fail=$((fail+1)); }
 
 # wait_until <max_seconds> <bash_test_expression>
 # Re-evaluates the test every 2 s; returns 0 the first time it succeeds,
-# 1 if the deadline passes without success. The test is plain bash —
+# 1 if the deadline passes without success. The test is plain bash --
 # anything `if <expr>; then ...` would accept.
 wait_until() {
   local max=$1; shift
@@ -95,7 +95,7 @@ else
 fi
 
 step 'swa-agent attested and was issued an SVID'
-# Look on the SERVER side, not the agent side — see deviation #2 above.
+# Look on the SERVER side, not the agent side -- see deviation #2 above.
 if wait_until 60 'kubectl -n '"$ns"' logs deploy/swa-server --tail=400 2>/dev/null | grep -qE "msg=SVIDIssued .*subject=spiffe://[^ ]+/swa-agent/"'; then
   ok 'agent SVID issued by server'
 else
@@ -111,7 +111,7 @@ else
   err 'expected RSA, found: '"$(grep -oE '[A-Z]+[0-9]+' <<<"$data" | sort -u | xargs)"
 fi
 
-# ---- Tenant-side check (mints its own base64 token — see deviation #3) ------
+# ---- Tenant-side check (mints its own base64 token -- see deviation #3) ------
 
 step 'SaaS tenant has trust_domain=idira.demo (control-plane round-trip)'
 : "${CONCEAL_NAMESPACE:?set in .envrc (Keychain namespace holding client_id+client_secret)}"

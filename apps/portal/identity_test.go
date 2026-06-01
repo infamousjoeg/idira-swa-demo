@@ -125,9 +125,8 @@ func makePortalTestSVID(t *testing.T) *x509svid.SVID {
 	return makeRSATestSVID(t, "spiffe://idira.demo/kind-ng/ns/swa-demo/sa/portal", time.Hour)
 }
 
-// TestIdentity_IncludesCertMetadata asserts the M6 cert-metadata fields are
-// populated on portal_svid from the underlying X.509 cert. Spec §5 of the
-// 2026-05-29 flip-card-detail-view design + plan Task 1.
+// TestIdentity_IncludesCertMetadata asserts the cert-metadata fields are
+// populated on portal_svid from the underlying X.509 cert.
 func TestIdentity_IncludesCertMetadata(t *testing.T) {
 	carrier := &stubCarrierIdentity{resp: &identityResp{
 		SANURI:            "spiffe://idira.demo/kind-ng/ns/swa-demo/sa/carrier",

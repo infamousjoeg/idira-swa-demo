@@ -197,11 +197,11 @@ body {
 .cta { box-shadow: none !important; border-radius: 0 !important; }
 .resolve input { border-radius: 0 !important; }
 
-/* === M4 diagram (right pane) === */
+/* === Diagram (right pane) === */
 .diagram { display: block; }
 .diagram svg { width: 100%; height: auto; display: block; }
 
-/* Stage state classes — added/removed by diagram.js on SVG children. */
+/* Stage state classes -- added/removed by diagram.js on SVG children. */
 .diagram .stage-rect          { stroke: var(--text-mute); stroke-dasharray: 3 3; fill: none; transition: stroke 150ms ease-out, fill 150ms ease-out, stroke-dasharray 150ms ease-out; }
 .diagram .stage-rect--lit     { stroke: var(--idira-500); stroke-dasharray: 0; fill: var(--bg-inspector-lift); }
 .diagram .stage-rect--hero    { fill: var(--idira-500); stroke: var(--idira-500); stroke-dasharray: 0; }
@@ -224,7 +224,7 @@ body {
 
 .diagram .err-caption    { fill: var(--panw-orange); font-style: italic; }
 
-/* === M4 trust evidence card (left pane) === */
+/* === Trust evidence card (left pane) === */
 .evidence {
   margin-top: 20px;
   padding: 16px 18px;
@@ -255,7 +255,7 @@ body {
 .evidence--dim { color: var(--text-mute); }
 .evidence--dim b { color: var(--text-mute); }
 
-/* === M5 pacing toggle (chrome over the inspector pane) === */
+/* === Pacing toggle (chrome over the inspector pane) === */
 .pace-control {
   display: flex; align-items: baseline; gap: 10px;
   margin-top: 4px;
@@ -283,13 +283,13 @@ body {
   border-bottom: 1px solid var(--idira-500);
 }
 
-/* === M5 contrast lift: label-mute readability on the dark inspector pane === */
+/* === Contrast lift: label-mute readability on the dark inspector pane === */
 /* --text-mute (#4A4A52) on --bg-inspector (#0B0D14) is ~2.4:1 (fails WCAG AA). */
 /* Scoped to .diagram so .pace-control__opt inactive (which uses --text-mute on */
 /* a different background) is unaffected. */
 .diagram .label-mute { fill: #8B8E9E; }
 
-/* === M5 contrast lift: JWT hero panel labels === */
+/* === Contrast lift: JWT hero panel labels === */
 /* When #jwt-rect goes .stage-rect--hero, its fill is --idira-500 (#265BFF). */
 /* label-idira (#6186FC) on that drops to ~1.8:1. :has() activates only while */
 /* the rect is in hero state, so the resting state on the dark pane is intact. */
@@ -297,7 +297,7 @@ body {
 
 /* === Flip-card detail view === */
 /* Click any lit card to flip and reveal its underlying detail. Scale-flip */
-/* animation (250ms ease-in-out); all tokens reused from the M5 palette.   */
+/* animation (250ms ease-in-out); all tokens reused from the inspector palette. */
 
 .diagram g.card-host {
   transform-box: fill-box;
@@ -322,8 +322,8 @@ body {
 .diagram g.card-host:hover .stage-rect { stroke: #FFFFFF; }
 
 /* Back content (rendered inside foreignObject -> div.card-back-host). */
-/* No border-radius: 0 (explicit) lets the brand-purity smoke catch any AI-   */
-/* generation rounding regressions per validator §13.4 #5.                    */
+/* No border-radius: 0 (explicit) lets the brand-purity smoke catch any       */
+/* rounding regressions on the card-back surface.                             */
 .card-back-host { width: 100%; height: 100%; }
 .card-back {
   background: var(--bg-inspector-lift);
@@ -376,7 +376,7 @@ body {
 .card-back__json .json-num   { color: #FFFFFF; }
 .card-back__json .json-punct { color: #4A4A52; }
 
-/* M6 scrollbar -- Whisper Rail (ambient).                                      */
+/* Card-back scrollbar -- Whisper Rail (ambient).                               */
 /* Invisible at rest. On card hover the thumb fades up in a deep-brand ghost    */
 /* (--idira-750 at ~70%); direct thumb hover brightens to --idira-500;          */
 /* active drag drops to --idira-250. Matches the cartographic, line-only,       */

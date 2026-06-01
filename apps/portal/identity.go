@@ -30,7 +30,7 @@ type identityConfig struct {
 	SecretID    string
 }
 
-// identityFullResp is the JSON shape served at portal /identity. Spec §5.5.
+// identityFullResp is the JSON shape served at portal /identity.
 type identityFullResp struct {
 	TrustDomain string        `json:"trust_domain"`
 	ServerGroup string        `json:"server_group"`
@@ -78,7 +78,7 @@ func (a *identityAggregator) snapshot(ctx context.Context) (identityFullResp, in
 	// Local SVID
 	psvid, err := a.local.GetX509SVID()
 	if err != nil || psvid == nil || len(psvid.Certificates) == 0 {
-		// Portal can't read its own SVID — return 503 with empty body fields.
+		// Portal can't read its own SVID -- return 503 with empty body fields.
 		return out, http.StatusServiceUnavailable
 	}
 	pcert := psvid.Certificates[0]
@@ -130,11 +130,10 @@ func firstPathSegment(path string) string {
 	return trimmed
 }
 
-// certMetadata extracts the M6 cert-detail fields from an X.509 cert in a
+// certMetadata extracts the cert-detail fields from an X.509 cert in a
 // single pass: subject DN, issuer DN, hex serial, signature algorithm name,
 // and a hex-encoded SHA-256 fingerprint of the DER bytes. Mirrors the same
-// helper in apps/carrier/identity.go. Spec §5 of the 2026-05-29 flip-card
-// detail-view design.
+// helper in apps/carrier/identity.go.
 func certMetadata(cert *x509.Certificate) (subj, iss, serial, sigAlg, fingerprint string) {
 	if cert == nil {
 		return "", "", "", "", ""

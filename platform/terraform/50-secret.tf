@@ -1,25 +1,25 @@
-# 50-secret.tf — The actual Conjur variable the carrier reads + inline
+# 50-secret.tf -- The actual Conjur variable the carrier reads + inline
 # permission scoping that read/execute to exactly the carrier SPIFFE host.
 #
 # Provider: cyberark/conjur ~> 0.8.4. Resource is `conjur_secret` (NOT
-# `conjur_variable` — the SCHEMA.md catalog discovered on 2026-05-27 confirms
+# `conjur_variable` -- the SCHEMA.md catalog discovered on 2026-05-27 confirms
 # `conjur_secret` is the variable-CRUD resource). The plan example's
 # `conjur_secret { variable = "..." }` shape is translated below into the
 # actual schema: `branch` (parent path) + `name` (leaf segment).
 #
 # Value: random_password rotates on node_group change so each `make up` after
 # a node group rename gets a fresh secret (no point in stable secrets in a
-# demo — and rotation pressure-tests the carrier's read path).
+# demo -- and rotation pressure-tests the carrier's read path).
 #
 # Permissions: inline `permissions = [...]` block grants read+execute to the
 # carrier host (declared in 40-policy.tf) and no one else. This is the spec
-# §13.4 criterion "secret scoping is least privilege" — only that one host
+# §13.4 criterion "secret scoping is least privilege" -- only that one host
 # can fetch this one variable; no consumer groups, no wildcards.
 #
 # PROVIDER QUIRK reminder: same literal-string-only rule applies to
-# conjur_secret.branch (verified empirically — variable interpolation in
+# conjur_secret.branch (verified empirically -- variable interpolation in
 # branch trips ValidateConfig). subject.id below is also a literal for the
-# same reason (defense-in-depth — the quirk affects multiple attrs on this
+# same reason (defense-in-depth -- the quirk affects multiple attrs on this
 # provider line).
 
 resource "random_password" "carrier_api_key" {
@@ -28,14 +28,14 @@ resource "random_password" "carrier_api_key" {
 
   # Rotate when the carrier's node group is renamed (which would also change
   # the carrier's SPIFFE ID and force a re-bind in 40-policy.tf). Demo-grade
-  # rotation policy — production would key off something more deliberate.
+  # rotation policy -- production would key off something more deliberate.
   keepers = {
     rotate_on = var.node_group
   }
 }
 
 resource "conjur_secret" "carrier_api_key" {
-  # Literal — same provider quirk as conjur_policy_branch.branch /
+  # Literal -- same provider quirk as conjur_policy_branch.branch /
   # conjur_host.branch (see 40-policy.tf header). Must match
   # conjur_policy_branch.swa_demo_carrier.full_id ("data/swa-demo/carrier")
   # in lockstep with any change to that branch path.
@@ -52,7 +52,7 @@ resource "conjur_secret" "carrier_api_key" {
   value  = random_password.carrier_api_key.result
 
   # NOTE on permissions: the inline `permissions = [...]` block on
-  # conjur_secret is a no-op in provider v0.8.4 — verified by reading
+  # conjur_secret is a no-op in provider v0.8.4 -- verified by reading
   # back the variable's permissions via /api/resources REST after apply
   # (empty list, even though TF state holds the requested grant). The
   # actual permission grant is therefore split out into a separate
@@ -65,14 +65,14 @@ resource "conjur_secret" "carrier_api_key" {
 
 # Load the carrier host out-of-band via PATCH policy YAML (the cyberark/conjur
 # v0.8.4 conjur_host resource has a broken Read that drops the host from state
-# on every refresh — see 40-policy.tf header). The script is idempotent: re-
+# on every refresh -- see 40-policy.tf header). The script is idempotent: re-
 # loading the same host body returns 201 with no-op. Triggers ensure the
 # resource re-runs if the SPIFFE ID or the authenticator changes.
 resource "null_resource" "carrier_host" {
   triggers = {
     spiffe_id     = "spiffe://idira.demo/kind-ng/ns/swa-demo/sa/carrier"
     authenticator = conjur_authenticator.swa.name
-    # Re-run on trust-domain change — the workloads branch (parent of the
+    # Re-run on trust-domain change -- the workloads branch (parent of the
     # host) lives under the trust domain and is auto-created by the SWA
     # provider when the trust domain registers (see 40-policy.tf header).
     trust_domain = swa_trust_domain.idira.name
@@ -101,8 +101,8 @@ resource "null_resource" "carrier_host" {
 }
 
 # Grant the carrier host read+execute on the api-key variable. This is the
-# only host that can fetch this variable, satisfying spec §13.4 "secret
-# scoping is least privilege".
+# only host that can fetch this variable: secret scoping is intentionally
+# least-privilege in this demo.
 resource "conjur_permission" "carrier_read_api_key" {
   privileges = ["read", "execute"]
 

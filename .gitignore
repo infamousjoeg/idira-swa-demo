@@ -1,10 +1,11 @@
 swa-release-1.0.4/
 .playwright-mcp/
-.superpowers/
 .DS_Store
 
-# M1 additions
+# Local environment
 .envrc
+
+# Terraform local state and lock files
 platform/terraform/.terraform/
 platform/terraform/.terraform.lock.hcl
 platform/terraform/terraform.tfstate
@@ -12,27 +13,24 @@ platform/terraform/terraform.tfstate.backup
 platform/terraform/terraform.tfstate.*.backup
 platform/terraform/.terraform.tfstate.lock.info
 platform/terraform/SCHEMA.md
+
+# Rendered Helm values (generated from *.values.yaml.tmpl by `make install-*`)
 platform/helm/*.values.yaml
 
-# M2 additions
+# Built binaries (produced by `make build-*`)
 apps/carrier/carrier
+apps/portal/portal
 
-# M3 additions
+# UI test artifacts
 ui-tests/node_modules/
 ui-tests/test-results/
 ui-tests/playwright-report/
-apps/portal/portal
 out/
 
-# Pre-publish additions (2026-05-28)
-# Build/process artifacts that don't belong in a public repo:
-#   - docs/superpowers/ holds the brainstormed spec + plans + validator
-#     reports. Kept locally for reproducibility, not for redistribution.
+# Local-only build/process artifacts that don't belong in a public repo:
 #   - swa-docs/secrets-manager-saas-api*.yaml is CyberArk's public API
-#     spec (downloaded from api-docs.cyberark.com) — referenceable, not
-#     redistributable.
-#   - Any PDFs that may sneak in (PANW brand guidelines, datasheets, etc.)
-#     are gitignored as a class.
-docs/superpowers/
+#     reference (downloaded from api-docs.cyberark.com) -- referenceable,
+#     not redistributable.
+#   - PDFs (brand guidelines, datasheets, etc.) are excluded as a class.
 swa-docs/secrets-manager-saas-api*.yaml
 *.pdf

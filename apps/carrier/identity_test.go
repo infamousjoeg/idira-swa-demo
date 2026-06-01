@@ -102,9 +102,8 @@ func TestIdentity_SourceErrorReturns500(t *testing.T) {
 	}
 }
 
-// TestIdentity_IncludesCertMetadata asserts the M6 cert-metadata fields are
-// populated from the underlying X.509 cert. Spec §5 of the 2026-05-29
-// flip-card-detail-view design + plan Task 1.
+// TestIdentity_IncludesCertMetadata asserts the cert-metadata fields are
+// populated from the underlying X.509 cert.
 func TestIdentity_IncludesCertMetadata(t *testing.T) {
 	svid := makeRSATestSVID(t, "spiffe://idira.demo/kind-ng/ns/swa-demo/sa/carrier", 60*time.Minute)
 	w := httptest.NewRecorder()

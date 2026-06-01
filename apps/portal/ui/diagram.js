@@ -1,4 +1,4 @@
-// diagram.js — live SPIFFE trust diagram. Replaces inspector.js.
+// diagram.js -- live SPIFFE trust diagram. Replaces inspector.js.
 //
 // Lifecycle:
 //   1. On import, render the SVG skeleton into #diagram (all stages in idle state).
@@ -26,13 +26,13 @@ async function loadIdentity() {
     console.error('diagram: /identity failed:', err);
     paintIdentityUnavailable();
   }
-  // Branch connectors below the hierarchy ribbon are always "lit" — they
+  // Branch connectors below the hierarchy ribbon are always "lit" -- they
   // represent static infrastructure relationships, not in-flight requests.
   ['branch-stem', 'branch-cross', 'branch-l', 'branch-r'].forEach(id => setConnState(id, 'lit'));
 }
 
 function renderSkeleton(host) {
-  // Coordinates pulled directly from the Frame 1 mockup. Keep this SVG
+  // Coordinates pulled directly from the diagram design. Keep this SVG
   // hand-authored -- no string templating, no D3 -- so the structure is
   // greppable when something looks wrong.
   host.innerHTML = `
@@ -267,7 +267,7 @@ const DISPATCH = {
     // Optimistically mark carrier as "we're reaching for it" so the card lights
     // in visual order. mtls.handshake.ok is emitted only after the full HTTP
     // response is read, by which time the carrier has already issued the JWT,
-    // hit SM, and returned the secret — leaving carrier-rect dark until last
+    // hit SM, and returned the secret -- leaving carrier-rect dark until last
     // unless we surface a pending state up front.
     setRectState('carrier-rect', 'pending');
   },
@@ -322,7 +322,7 @@ function handleError(ev) {
   if (!target) return;
   if (target.kind === 'rect') setRectState(target.id, 'err');
   else                        setConnState(target.id, 'err');
-  // Caption: keep short — payload.err truncated to 90 chars.
+  // Caption: keep short -- payload.err truncated to 90 chars.
   const caption = String(ev.payload?.err || ev.type).slice(0, 90);
   appendErrorCaption(target.id, caption);
 }
@@ -397,7 +397,7 @@ function resetForReplay() {
   // Called on portal.resolve.requested. Returns all stages below the hierarchy ribbon to idle.
   ['portal-rect', 'carrier-rect', 'jwt-rect', 'sm-rect', 'secret-rect'].forEach(id => setRectState(id, null));
   ['mtls-line', 'to-jwt', 'to-sm', 'to-secret', 'branch-stem', 'branch-cross', 'branch-l', 'branch-r'].forEach(id => setConnState(id, 'lit'));
-  // Restore branch connectors to lit immediately — they reflect static hierarchy, not flow.
+  // Restore branch connectors to lit immediately -- they reflect static hierarchy, not flow.
   setText('mtls-label', 'mTLS');
   setText('mtls-cipher', '');
   setText('to-sm-label', '');
@@ -438,7 +438,7 @@ subscribeTTL(({ remaining, fraction }) => {
 // === CTA flip: RESOLVE ↔ SKIP ===
 // While pace-queue is draining a walk, the resolve button becomes SKIP.
 // Clicking SKIP calls skipPace() which collapses the rest of the queue to
-// real-time so all remaining stages paint immediately. Spec §6.6.
+// real-time so all remaining stages paint immediately.
 
 const cta = document.querySelector('button.cta');
 let originalLabel = cta?.textContent || 'RESOLVE SECRET';

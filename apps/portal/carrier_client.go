@@ -33,10 +33,10 @@ type CarrierClient struct {
 
 // NewCarrierClient builds an mTLS-secured client that trusts only the peer
 // SPIFFE ID provided. Both the call-path client and the trace-path client
-// share the same TLS config (same SVID, same authorizer) — spec §9.3 & §9.4.
+// share the same TLS config (same SVID, same authorizer).
 //
-// AuthorizeID, not AuthorizeAny or AuthorizeMemberOf — spec §13.4 #4 and the
-// builder constraints (no wildcard mTLS authorizer).
+// AuthorizeID, not AuthorizeAny or AuthorizeMemberOf: this demo deliberately
+// has no wildcard mTLS authorizer. Only the exact carrier SPIFFE ID is trusted.
 func NewCarrierClient(src *workloadapi.X509Source, host string, peer spiffeid.ID, bus *TraceBus) *CarrierClient {
 	tlsCfg := tlsconfig.MTLSClientConfig(src, src, tlsconfig.AuthorizeID(peer))
 	return &CarrierClient{
@@ -89,7 +89,7 @@ func (c *CarrierClient) Lookup(ctx context.Context, shipmentID string) ([]byte, 
 // Identity fetches the carrier's /identity over the existing mTLS client.
 // Used by the portal /identity aggregator. Caching is the caller's concern.
 func (c *CarrierClient) Identity(ctx context.Context) (*identityResp, error) {
-	// hostFromURL returns "host:port" — use Hostname() to drop the :8443
+	// hostFromURL returns "host:port" -- use Hostname() to drop the :8443
 	// before re-suffixing with the trace/identity port :8444.
 	parsed, err := url.Parse(c.baseURL)
 	if err != nil {
@@ -193,7 +193,7 @@ func tlsCipherName(s *tls.ConnectionState) string {
 
 // peerSANURI returns the first SAN URI from the peer cert, or "" if none.
 // Plain-HTTP responses (no TLS state) and certs without a URI SAN both
-// return "" — emitting "" is correct: the inspector treats empty as "unknown"
+// return "" -- emitting "" is correct: the inspector treats empty as "unknown"
 // without crashing.
 func peerSANURI(s *tls.ConnectionState) string {
 	if s == nil || len(s.PeerCertificates) == 0 {

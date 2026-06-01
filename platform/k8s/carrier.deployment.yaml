@@ -30,7 +30,7 @@ spec:
                 configMapKeyRef: {name: carrier-config, key: secret_id}
             - name: SPIFFE_ENDPOINT_SOCKET
               value: unix:///run/swa-agent/api.sock
-            # M3: only this exact SPIFFE ID is accepted on mTLS — spec §13.4 #4.
+            # Only this exact portal SPIFFE ID is accepted on mTLS (no wildcards).
             - name: PORTAL_SPIFFE_ID
               value: spiffe://idira.demo/kind-ng/ns/swa-demo/sa/portal
           volumeMounts:
@@ -39,7 +39,7 @@ spec:
               readOnly: true
           readinessProbe:
             # mTLS gates :8443 but a HTTPS probe with httpGet.scheme=HTTPS
-            # completes the TLS handshake without sending a client cert —
+            # completes the TLS handshake without sending a client cert --
             # kubelet validates the server cert against the cluster CA bundle.
             # That's not what we want (kubelet has no SPIFFE cert), so use a
             # TCP probe instead: success means the listener is up + TLS is

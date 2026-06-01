@@ -128,7 +128,7 @@ func TestLookup_AuthnJWTFailureReturns502AndEmitsError(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	// Subscribe BEFORE the handler runs. TraceBus is drop-on-slow-consumer
-	// and drops events emitted while no subscribers exist — a late drainBus
+	// and drops events emitted while no subscribers exist -- a late drainBus
 	// would observe nothing. (Plan-text bug: the original drainBus subscribed
 	// after handler invocation.)
 	ch := deps.bus.Subscribe()
@@ -235,7 +235,6 @@ func TestLookup_EmitsAlgAndKid(t *testing.T) {
 // TestEmitSMSecretFetchedOK_NeverContainsSecretValue asserts the no-leak
 // discipline on the secret-fetch event: no field of the emitted payload may
 // contain the actual secret bytes. The byte count is allowed (and required).
-// Spec §6.2 + validator §13.4 #4.
 func TestEmitSMSecretFetchedOK_NeverContainsSecretValue(t *testing.T) {
 	secretValue := []byte("SUPER-SECRET-API-KEY-DO-NOT-LEAK")
 	bus := NewTraceBus(64)
@@ -285,10 +284,10 @@ func TestEmitSMSecretFetchedOK_NeverContainsSecretValue(t *testing.T) {
 // sm.authn_jwt.ok payload contains the full bearer token: only token_redacted
 // is allowed to surface it (and only as the safe display form). The redaction
 // is enforced at the Go wire-emission boundary in handler.go via redactBearer;
-// the frontend never sees the full token. Spec §6.2 + validator §13.4 #4.
+// the frontend never sees the full token.
 func TestEmitSMAuthnJWTOK_RedactsBearer(t *testing.T) {
 	// Realistic-looking bearer: long enough that a regex scan in the smoke
-	// test (Task 12) would catch any unredacted leakage.
+	// test would catch any unredacted leakage.
 	fullToken := "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJob3N0L3N3YS1kZW1vL2NhcnJpZXIiLCJpYXQiOjE3NDgwMDAwMDAsImV4cCI6MTc0ODAwMDQ4MH0.LONGFAKESIGNATUREFAKESIGNATURE"
 	bus := NewTraceBus(64)
 	deps := newTestDeps(t, &stubSM{authnToken: fullToken, secret: []byte("api-key")}, nil, nil)
@@ -332,10 +331,9 @@ func TestEmitSMAuthnJWTOK_RedactsBearer(t *testing.T) {
 	}
 }
 
-// TestEmitJWTSvidIssued_IncludesFullClaims asserts the M6 payload extension:
-// the emitted jwt_svid.issued event must carry iss, iat, jti, typ, and raw on
-// top of the M3-era aud/exp/spiffe_id/alg/kid. Spec §5 of the 2026-05-29
-// flip-card-detail-view design + plan Task 2. Only key PRESENCE is checked
+// TestEmitJWTSvidIssued_IncludesFullClaims asserts the emitted
+// jwt_svid.issued event carries the full claim set: aud, exp, spiffe_id,
+// alg, kid, iss, iat, jti, typ, and raw. Only key PRESENCE is checked
 // here -- the stub SVID's Marshal() returns "" so the decode helpers will
 // produce nil values; that's fine because we only want to fail loud when a
 // key is missing from the map.
@@ -372,7 +370,7 @@ func TestEmitJWTSvidIssued_IncludesFullClaims(t *testing.T) {
 }
 
 // TestDecodeJWTClaims_KnownToken asserts the decode helper round-trips a
-// known JWT body segment correctly. Plan Task 2 helper coverage.
+// known JWT body segment correctly.
 func TestDecodeJWTClaims_KnownToken(t *testing.T) {
 	// header={"alg":"RS256"}, body={"iss":"swa-server","iat":1748000000,"jti":"abc"}, sig=dummy
 	tok := "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJzd2Etc2VydmVyIiwiaWF0IjoxNzQ4MDAwMDAwLCJqdGkiOiJhYmMifQ.sig"

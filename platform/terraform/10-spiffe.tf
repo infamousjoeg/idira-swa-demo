@@ -1,15 +1,15 @@
-# 10-spiffe.tf — SPIFFE hierarchy on the SaaS tenant.
+# 10-spiffe.tf -- SPIFFE hierarchy on the SaaS tenant.
 # Creation order is enforced by attribute references:
 #   trust_domain → server_group → node_group.
 #
 # All attribute names below were verified against the bundled provider's
-# schema (see SCHEMA.md). The plan's draft used `node_attestor`,
-# `trust_domain`, `server_group`, and a top-level `workload_id_template` —
-# none of which exist in the provider. Discovered names:
+# schema. Plausible-looking alternative names (`node_attestor`,
+# `trust_domain`, `server_group`, a top-level `workload_id_template`) do
+# NOT exist in the provider. Discovered names:
 #   - `node_attestation` (not `node_attestor`)
 #   - `trust_domain_name`  (not `trust_domain`)
 #   - `server_group_name`  (not `server_group`)
-#   - `k8s_psat.clusters = { <name> = {...} }`  — a MAP keyed by cluster
+#   - `k8s_psat.clusters = { <name> = {...} }`  -- a MAP keyed by cluster
 #     name, not a flat `cluster = "..."` attribute
 #   - `workload_type` is REQUIRED on swa_node_group (plan omitted it)
 #   - `workload_configuration.spiffe_id_template` (not top-level
@@ -28,7 +28,7 @@ resource "swa_server_group" "kind_sg" {
   # `description = ""` post-apply even when HCL omits it, causing Terraform
   # to error on "inconsistent result after apply" (was null, now ""). Setting
   # the field explicitly to a string keeps plan and apply state aligned.
-  description = "kind-laptop server group (k8s_psat) — M1"
+  description = "kind-laptop server group (k8s_psat) -- M1"
 
   node_attestation = {
     k8s_psat = {
@@ -48,7 +48,7 @@ resource "swa_server_group" "kind_sg" {
           # agent log shows
           #   PermissionDenied: "swa-system:swa-agent" is not an allowed
           #   service account
-          # — i.e. the server prints the SA in colon form and matches the
+          # -- i.e. the server prints the SA in colon form and matches the
           # allow-list literally.
           service_account_allow_list = [
             "${var.swa_namespace}:${var.swa_agent_sa}",
@@ -64,9 +64,9 @@ resource "swa_node_group" "kind_ng" {
   trust_domain_name = swa_trust_domain.idira.name
   server_group_name = swa_server_group.kind_sg.name
   # See swa_server_group: same "was null, now \"\"" provider quirk.
-  description = "kind-laptop node group — M1"
+  description = "kind-laptop node group -- M1"
 
-  # REQUIRED — schema enum is "unix" | "kubernetes". Drives the default
+  # REQUIRED -- schema enum is "unix" | "kubernetes". Drives the default
   # SPIFFE ID template and variable-prefix conventions.
   workload_type = "kubernetes"
 

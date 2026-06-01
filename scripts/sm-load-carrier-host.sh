@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# sm-load-carrier-host.sh — manage the carrier SPIFFE host on the SM tenant.
+# sm-load-carrier-host.sh -- manage the carrier SPIFFE host on the SM tenant.
 #
 # Why a script instead of `conjur_host` resource: cyberark/conjur provider
 # v0.8.4 has a broken Read implementation for hosts whose name contains
 # colons (SPIFFE IDs do). Every `terraform plan/apply` refresh 404s on the
 # host even when it exists, drops the resource from state, and then 409
 # Conflict's on recreate. This script loads the host via PATCH policy YAML
-# (which IS idempotent for create — repeated loads of the same host return
+# (which IS idempotent for create -- repeated loads of the same host return
 # 201 with no-op result) so the carrier identity survives multiple
 # `terraform apply` cycles. See platform/terraform/40-policy.tf for the
 # full context and 50-secret.tf for the conjur_permission that grants the
 # host read/execute on the api-key variable.
 #
 # Usage:
-#   sm-load-carrier-host.sh up    — create or refresh the host record
-#   sm-load-carrier-host.sh down  — delete the host record
+#   sm-load-carrier-host.sh up    -- create or refresh the host record
+#   sm-load-carrier-host.sh down  -- delete the host record
 #
-# Env (REQUIRED — set by Terraform local-exec or Makefile target):
+# Env (REQUIRED -- set by Terraform local-exec or Makefile target):
 #   CONJUR_APPLIANCE_URL   SM SaaS base URL (https://<sub>.secretsmgr.cyberark.cloud)
 #   CONJUR_AUTHN_TOKEN     Raw Conjur JSON access token from get-sm-token.sh
 #                          (this script base64-encodes it for the REST header)
@@ -27,7 +27,7 @@
 # IMPORTANT: trust domain "idira.demo" and node group "kind-ng" are
 # hardcoded here in lockstep with the literals in 40-policy.tf (the
 # provider quirk that forces literal-only `branch` values applies equally
-# to YAML policy loads — there's no var.X substitution into the URL).
+# to YAML policy loads -- there's no var.X substitution into the URL).
 set -euo pipefail
 
 action="${1:-}"
@@ -59,13 +59,13 @@ spiffe_id="spiffe://idira.demo/kind-ng/ns/swa-demo/sa/carrier"
 #     See swa-docs/pages/cjr-authn-jwt-swa.md lines 137-153.
 #   - Without the `authn-jwt/secureWorkloadAccess/sub` annotation, SM cannot
 #     map the JWT-SVID's `sub` claim back to the host record and the
-#     authenticate endpoint returns 401 with an empty body — diagnostically
+#     authenticate endpoint returns 401 with an empty body -- diagnostically
 #     useless. Verified 2026-05-27 by exhaustively confirming iss/aud/sub
 #     are correct, signature/JWKS kid match, host is in apps group, and the
 #     401 still occurred until the annotation was added.
 #   - SM does NOT auto-add hosts under the authenticator's identity_path
 #     to the `conjur/authn-jwt/secureWorkloadAccess/apps` consumer group
-#     (verified 2026-05-27 via GET /resources/.../group/.../apps — the
+#     (verified 2026-05-27 via GET /resources/.../group/.../apps -- the
 #     group's `members` field stays empty until explicitly granted).
 #     Without that membership SM returns 403 from the authenticate endpoint
 #     even though the JWT-SVID is signature-valid and iss/aud/sub-correct.
@@ -93,7 +93,7 @@ if [ "$action" = "up" ]; then
 - !host
   id: ${spiffe_id}
   annotations:
-    description: Idira SWA demo — carrier service (M2)
+    description: Idira SWA demo -- carrier service (M2)
     spiffe_id: ${spiffe_id}
     authn-jwt/secureWorkloadAccess/sub: ${spiffe_id}
 YAML

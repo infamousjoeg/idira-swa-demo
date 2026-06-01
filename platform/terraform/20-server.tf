@@ -1,17 +1,17 @@
-# 20-server.tf — register the kind cluster as an SWA server using inline JWKS.
+# 20-server.tf -- register the kind cluster as an SWA server using inline JWKS.
 #
 # Why inline JWKS:
 #   The SaaS tenant cannot reach a laptop's kind API server, so the JWT
-#   authenticator config must embed JWKS content via `auth.public_keys`
-#   (see SCHEMA.md). The bundled provider's auth schema requires the
-#   wrapper `{"type":"jwks","value":{"keys":[...]}}` — raw JWKS is not
-#   accepted. `scripts/kind-oidc.sh` returns the issuer + raw JWKS; the
-#   wrapping happens here, in HCL, so the script stays kind-agnostic.
+#   authenticator config must embed JWKS content via `auth.public_keys`.
+#   The bundled provider's auth schema requires the wrapper
+#   `{"type":"jwks","value":{"keys":[...]}}` -- raw JWKS is not accepted.
+#   `scripts/kind-oidc.sh` returns the issuer + raw JWKS; the wrapping
+#   happens here, in HCL, so the script stays kind-agnostic.
 #
-# Deviations from the plan's draft (also catalogued in SCHEMA.md):
+# Schema quirks worth knowing:
 #   - swa_server has NO `trust_domain` field (server is scoped only via
 #     server_group).
-#   - The field is `server_group_id` (not `server_group`) — pass the
+#   - The field is `server_group_id` (not `server_group`) -- pass the
 #     computed `.id` from swa_server_group.
 #   - The block is named `auth` (not `authentication`), and its inner
 #     fields are flat (no nested `data = {...}` indirection).
@@ -35,7 +35,7 @@ resource "swa_server" "kind" {
 
     # JWT claim values for the swa-server pod's projected SA token:
     #   - audience = "conjur"  (matches controlPlane.auth.audience in
-    #     swa-server chart's values.yaml — the projected volume mounts a
+    #     swa-server chart's values.yaml -- the projected volume mounts a
     #     token with this audience for SM authentication)
     #   - subject  = "system:serviceaccount:<ns>:<sa>"  (canonical
     #     Kubernetes SA subject for the swa-server pod)
@@ -50,9 +50,9 @@ resource "swa_server" "kind" {
       value = jsondecode(data.external.kind_oidc.result.public_keys)
     })
 
-    # Deliberately no `jwks_uri` — tenant cannot reach the laptop.
-    # Deliberately no `ca_cert` — only used with jwks_uri.
-    # Deliberately no `identity {}` — workload→identity mapping is an M2
+    # Deliberately no `jwks_uri` -- tenant cannot reach the laptop.
+    # Deliberately no `ca_cert` -- only used with jwks_uri.
+    # Deliberately no `identity {}` -- workload→identity mapping is an M2
     # concern (not part of server registration).
   }
 }

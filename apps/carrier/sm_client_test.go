@@ -53,7 +53,7 @@ func TestFetchSecret_AuthorizationHeaderAndPath(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Compare against RawPath (which preserves percent-encoding) not Path
 		// (Go decodes %2F back to /). Conjur treats %2F inside the variable ID
-		// as a literal slash within the ID — distinct from a path separator —
+		// as a literal slash within the ID -- distinct from a path separator --
 		// so the client MUST send the escaped form.
 		wantPath := "/api/secrets/conjur/variable/" + url.PathEscape(variableID)
 		if r.URL.RawPath != wantPath {
@@ -102,8 +102,8 @@ func TestAuthnJWT_NonOKStatusReturnsError(t *testing.T) {
 
 // TestAuthnJWT_PopulatesMetaWithTTL asserts the TTL parser extracts a
 // positive TokenTTLSeconds when SM returns a realistic Conjur authentication
-// envelope. Plan Task 4 spec. The envelope format mirrors what the real SM
-// authn-jwt endpoint produces: base64({"protected":"...","payload":"<b64>","signature":"..."}).
+// envelope. The envelope format mirrors what the real SM authn-jwt endpoint
+// produces: base64({"protected":"...","payload":"<b64>","signature":"..."}).
 func TestAuthnJWT_PopulatesMetaWithTTL(t *testing.T) {
 	// Inner payload: Conjur tokens default to 8min TTL (480s).
 	payloadJSON := []byte(`{"sub":"host/swa-demo/carrier","iat":1748000000,"exp":1748000480}`)
@@ -131,7 +131,7 @@ func TestAuthnJWT_PopulatesMetaWithTTL(t *testing.T) {
 	}
 }
 
-// Sanity: the response token from SM is opaque base64 — we should NOT decode it.
+// Sanity: the response token from SM is opaque base64 -- we should NOT decode it.
 func TestAuthnJWT_DoesNotDecodeBase64(t *testing.T) {
 	const respToken = "dGVzdC10b2tlbg==" // base64 of "test-token"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

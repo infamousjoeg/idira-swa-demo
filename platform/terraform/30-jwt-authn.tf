@@ -1,9 +1,8 @@
-# 30-jwt-authn.tf — Configure the Conjur authn-jwt authenticator
-# `secureWorkloadAccess` (spec §6.3) on the SM SaaS tenant.
+# 30-jwt-authn.tf -- Configure the Conjur authn-jwt authenticator
+# `secureWorkloadAccess` on the SM SaaS tenant.
 #
 # Provider: cyberark/conjur ~> 0.8.4 (NOT the bundled cyberark/swa provider,
-# which has no policy/authenticator/secret resources — see SCHEMA.md and
-# spec §7.1 AMENDED 2026-05-27).
+# which has no policy/authenticator/secret resources).
 #
 # Identity model:
 #   - issuer:             <sm_url>/api/swa/trust-domains/<td>
@@ -14,7 +13,7 @@
 #   - token_app_property: "sub"     (the JWT `sub` claim holds the SPIFFE ID)
 #   - identity_path:      data/swa/trust-domains/<td>/workloads
 #                                   (hosts authenticating via this JWT must
-#                                    live under this branch — see 40-policy.tf)
+#                                    live under this branch -- see 40-policy.tf)
 
 resource "conjur_authenticator" "swa" {
   name    = "secureWorkloadAccess"
@@ -35,7 +34,7 @@ resource "conjur_authenticator" "swa" {
   # PROVIDER QUIRK (v0.8.4): on refresh, the provider reads `issuer` and
   # `jwks_uri` back as stripped relative paths ("/api/swa/...") instead of
   # the full URLs that were actually written to the tenant (verified via
-  # direct REST GET on conjur/authn-jwt/.../{issuer,jwks-uri} variables —
+  # direct REST GET on conjur/authn-jwt/.../{issuer,jwks-uri} variables --
   # the tenant holds the full URLs correctly). This spurious diff forces
   # destroy+recreate on every apply. ignore_changes prevents the bogus
   # replacement; the `data` block is still the authoritative source on

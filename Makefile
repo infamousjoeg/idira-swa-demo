@@ -2,7 +2,7 @@ SHELL := bash
 .SHELLFLAGS := -euo pipefail -c
 
 # Required env (sourced from .envrc):
-#   PANW_SM_TENANT       (SM SaaS subdomain — see .envrc.example)
+#   PANW_SM_TENANT       (SM SaaS subdomain -- see .envrc.example)
 #   CONCEAL_NAMESPACE    (macOS Keychain namespace holding client_id+client_secret)
 # Optional:
 #   KIND_CLUSTER         (default "swa")
@@ -16,7 +16,7 @@ TF           := terraform -chdir=platform/terraform
 # SUMMON wraps a command, injecting CLIENT_ID + CLIENT_SECRET into its env from
 # Conceal-backed macOS Keychain. Provider flag is `conceal_summon` (not
 # `conceal`). The Keychain namespace is parameterized via $(CONCEAL_NAMESPACE)
-# — `make _check-env` requires it. printf builds the YAML at call time so
+# -- `make _check-env` requires it. printf builds the YAML at call time so
 # $(CONCEAL_NAMESPACE) is properly Make-expanded into both `!var` lines.
 SUMMON = summon -p conceal_summon --yaml "$$(printf 'CLIENT_ID: !var %s/client_id\nCLIENT_SECRET: !var %s/client_secret' '$(CONCEAL_NAMESPACE)' '$(CONCEAL_NAMESPACE)')"
 
@@ -33,7 +33,7 @@ doctor: ## Verify prerequisites
 
 _check-env:
 	@: "$${PANW_SM_TENANT:?set in .envrc (see .envrc.example)}"
-	@: "$${CONCEAL_NAMESPACE:?set in .envrc (see .envrc.example) — Keychain namespace holding client_id+client_secret}"
+	@: "$${CONCEAL_NAMESPACE:?set in .envrc (see .envrc.example) -- Keychain namespace holding client_id+client_secret}"
 
 tf-token: _check-env ## Print env exports to source for manual `terraform` use
 	@echo "export CONJUR_APPLIANCE_URL=$(PANW_SM_URL)"
@@ -59,16 +59,16 @@ images: ## Load bundled SWA images + busybox (init containers) into kind
 tf-init: install-tf-provider ## terraform init (after provider is installed)
 	$(TF) init -upgrade
 
-# tf-apply-platform — apply only the platform-side subset (10-spiffe + 20-server).
-# Workload-side resources (30/40/50) belong to M2 and are not present yet.
-# `-target` is used per spec §7.2 (two-apply pattern).
+# tf-apply-platform -- apply only the platform-side subset (10-spiffe + 20-server).
+# Workload-side resources (30/40/50) come later (see tf-apply-workloads).
+# `-target` is used to enforce a deterministic two-apply pattern.
 # The CONJUR_AUTHN_TOKEN is captured once into a $$tok shell var so it isn't
 # echoed on the command line (visible to `ps`); summon injects the underlying
 # CLIENT_ID/CLIENT_SECRET from Keychain via conceal_summon.
 tf-apply-platform: _check-env tf-init ## Apply TF subset #1: SPIFFE hierarchy + server registration
-	@# var.sm_url is required by 30-jwt-authn.tf (M2). Even though we use
+	@# var.sm_url is required by 30-jwt-authn.tf. Even though we use
 	@# -target to constrain *this* apply to the four SPIFFE resources, TF still
-	@# validates every variable in the root module — so sm_url must be set.
+	@# validates every variable in the root module -- so sm_url must be set.
 	@$(SUMMON) -- bash -c '\
 	  set -euo pipefail; \
 	  tok=$$(./scripts/get-sm-token.sh); \
@@ -99,21 +99,21 @@ install-agent: install-server ## Install/upgrade swa-agent (depends on server be
 	  -f platform/helm/swa-agent.values.yaml \
 	  --wait --timeout 3m
 
-smoke-m1: _check-env ## M1 acceptance check (spec §14.1). Exit 0 = PASS.
+smoke-m1: _check-env ## M1 acceptance check. Exit 0 = PASS.
 	@./scripts/smoke-m1.sh
 
-# up-m1 — full M1 from a clean slate. The dependency chain runs each step
-# in order (doctor → cluster → images → tf → helm → smoke). `make up` for
-# the whole demo is added in M3 (chains M1+M2+M3 targets); M1 exposes its
-# own composite so the validator can run a single command.
+# up-m1 -- full M1 from a clean slate. The dependency chain runs each step
+# in order (doctor -> cluster -> images -> tf -> helm -> smoke). `make up`
+# composes M1+M2+M3 for the full demo; up-m1 exposes a single-command
+# entry point for the M1 layer alone.
 up-m1: doctor cluster images tf-apply-platform install-server install-agent smoke-m1 ## Full M1 deploy + smoketest from clean slate
 	@echo
 	@echo 'M1 ready. Server + agent healthy, SPIFFE hierarchy registered on tenant.'
-	@echo 'Next: M2 plan (carrier service + secret).'
+	@echo 'Next: up-m2 (carrier service + secret).'
 
 cluster: ## Create the kind cluster ($(KIND_CLUSTER)) if not present
 	@if kind get clusters | grep -qx "$(KIND_CLUSTER)"; then \
-	  echo "kind cluster '$(KIND_CLUSTER)' already exists — skipping create"; \
+	  echo "kind cluster '$(KIND_CLUSTER)' already exists -- skipping create"; \
 	else \
 	  kind create cluster --name $(KIND_CLUSTER) --image kindest/node:v1.34.0; \
 	fi
@@ -134,7 +134,7 @@ down: _check-env ## Tear down everything (cluster + tenant TF state). Best-effor
 	@# are ~8min and a full destroy can outrun that on a slow tenant). The
 	@# tenant also intermittently returns 409 "Concurrent policy load" when
 	@# unrelated resources are being torn down in the same batch. Both
-	@# failure modes are transient — re-running `make down` cleans them up.
+	@# failure modes are transient -- re-running `make down` cleans them up.
 	@# Bake that retry into the recipe: up to 3 attempts, each gets a fresh
 	@# token, and we stop as soon as `terraform state list` is empty.
 	-@$(SUMMON) -- bash -c '\
@@ -153,9 +153,9 @@ down: _check-env ## Tear down everything (cluster + tenant TF state). Best-effor
 
 .PHONY: tf-apply-app build-apps deploy-apps smoke-m2 up-m2
 
-# --- M2 targets (real bodies added by later M2 tasks) ---
+# --- M2 targets (carrier service + secret) ---
 
-tf-apply-app: _check-env tf-init ## Apply TF subset #2: jwt authn + policy + secret (no -target — full apply)
+tf-apply-app: _check-env tf-init ## Apply TF subset #2: jwt authn + policy + secret (no -target -- full apply)
 	@$(SUMMON) -- bash -c '\
 	  set -euo pipefail; \
 	  tok=$$(./scripts/get-sm-token.sh); \
@@ -173,7 +173,7 @@ deploy-apps: ## Deploy carrier + portal into swa-demo
 	kubectl apply -f platform/k8s/namespace.yaml
 	kubectl apply -f platform/k8s/portal.sa.yaml
 	@# carrier-config holds the SM URL + variable path the carrier reads.
-	@# variable path is the Conjur resource id verbatim — `data/<branch>/<name>`
+	@# variable path is the Conjur resource id verbatim -- `data/<branch>/<name>`
 	@# (verified empirically 2026-05-27: omitting the `data/` prefix returns
 	@# CONJ00076E "variable not found" because Conjur looks up the literal
 	@# resource id and there is no record at the bare path).
@@ -185,7 +185,7 @@ deploy-apps: ## Deploy carrier + portal into swa-demo
 	  --from-literal=secret_id=data/swa-demo/carrier/api-key \
 	  --dry-run=client -o yaml | kubectl apply -f -
 	@# M3: retire the M2 portal-stub atomically before bringing up the real
-	@# portal. The stub was a plain curl pod under the same `portal` SA — it
+	@# portal. The stub was a plain curl pod under the same `portal` SA -- it
 	@# can no longer reach the (now mTLS-only) carrier, and the real portal
 	@# Deployment is what smoke-m2 / smoke-m3 talk to from M3 onward.
 	-kubectl -n swa-demo delete pod portal-stub --ignore-not-found
@@ -205,7 +205,7 @@ up-m2: up-m1 build-apps deploy-apps tf-apply-app smoke-m2 ## Full M2 deploy + sm
 .PHONY: portforward smoke-m3 up smoke readme-shots
 
 portforward: ## Forward portal :8080 to localhost (blocks)
-	@echo 'Portal at http://localhost:8080 — Ctrl+C to stop'
+	@echo 'Portal at http://localhost:8080 -- Ctrl+C to stop'
 	kubectl -n swa-demo port-forward svc/portal 8080:8080
 
 readme-shots: ## Capture docs/img/*.png from a live portal (uses :18080)
@@ -220,15 +220,15 @@ readme-shots: ## Capture docs/img/*.png from a live portal (uses :18080)
 smoke-m3: ## Run M3 acceptance check (headless browser)
 	@./scripts/smoke-ui.sh
 
-# up — full demo from clean slate. The dependency chain runs each step
+# up -- full demo from clean slate. The dependency chain runs each step
 # in order (M1 platform → app images → app deploy → app TF → M3 smoke).
 # Uses smoke-m3 at the end because the M3 headless smoke exercises the
-# full M1+M2+M3 stack — running smoke-m1/m2 separately would just be
+# full M1+M2+M3 stack -- running smoke-m1/m2 separately would just be
 # redundant during a clean `make up`.
 up: up-m1 build-apps deploy-apps tf-apply-app smoke-m3 ## Full demo deploy + smoketest
 	@echo
 	@echo 'Demo ready. Run: make portforward'
 
-# smoke — runs all three milestone smoketests in order. Use this to spot
+# smoke -- runs all three milestone smoketests in order. Use this to spot
 # which milestone broke if `make up` ever surprises you.
 smoke: smoke-m1 smoke-m2 smoke-m3 ## Run all milestone smoketests

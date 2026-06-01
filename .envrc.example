@@ -1,4 +1,4 @@
-# .envrc.example — copy to .envrc and fill in. .envrc is gitignored.
+# .envrc.example -- copy to .envrc and fill in. .envrc is gitignored.
 # Only non-secret env lives here. Secrets are read from macOS Keychain via
 # Conceal, injected into tenant-touching commands via `summon -p conceal_summon`.
 # The Identity-tenant URL is discovered at runtime via Platform Discovery

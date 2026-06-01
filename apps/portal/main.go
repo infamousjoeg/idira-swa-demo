@@ -48,7 +48,7 @@ func run() error {
 	}
 	socketPath := os.Getenv("SPIFFE_ENDPOINT_SOCKET")
 	if socketPath == "" {
-		// In-container default — matches the volumeMount in portal.deployment.yaml.
+		// In-container default -- matches the volumeMount in portal.deployment.yaml.
 		// The host's hostPath /tmp/swa-agent/public is mounted at /run/swa-agent.
 		socketPath = "unix:///run/swa-agent/api.sock"
 	}

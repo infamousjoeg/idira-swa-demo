@@ -1,14 +1,14 @@
-// readme-shots.mjs — capture the three README images at known viewport sizes.
+// readme-shots.mjs -- capture the three README images at known viewport sizes.
 //
 // Prerequisites:
 //   - kubectl port-forward svc/portal 18080:8080 (the Makefile target arranges this)
-//   - The portal Deployment has the current M5 UI (build-apps + deploy-apps).
+//   - The portal Deployment has the current UI (build-apps + deploy-apps).
 //
 // Output: docs/img/portal-empty.png, portal-walking.png, portal-resolved.png,
-//         portal-flipped-jwt.png             (M6: JWT card flipped, at rest),
-//         portal-flipped-jwt-scrolled.png    (M6 post-Whisper-Rail: JWT mid-scroll, ghost rail visible),
-//         portal-flipped-sm-scrolled.png     (M6 post-Whisper-Rail: SM scrolled to bottom, rail visible),
-//         portal-flipped-portal-cert.png     (M6 post-Whisper-Rail: portal X.509 hovered at scroll-top)
+//         portal-flipped-jwt.png             (JWT card flipped, at rest),
+//         portal-flipped-jwt-scrolled.png    (JWT mid-scroll, ghost Whisper Rail visible),
+//         portal-flipped-sm-scrolled.png     (SM scrolled to bottom, rail visible),
+//         portal-flipped-portal-cert.png     (portal X.509 hovered at scroll-top)
 
 import { mkdir } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
@@ -34,7 +34,7 @@ async function main() {
   const ctx = await browser.newContext({ viewport: VIEWPORT });
   const page = await ctx.newPage();
 
-  // 1) Empty / idle state — defaults to Medium pacing but no walk in flight.
+  // 1) Empty / idle state -- defaults to Medium pacing but no walk in flight.
   await page.goto(`${BASE}/`);
   await page.waitForSelector('#diagram svg', { state: 'visible' });
   // Wait for /identity fetch to populate hierarchy ribbon.
@@ -81,7 +81,7 @@ async function main() {
   await page.screenshot({ path: resolve(OUT_DIR, 'portal-resolved.png'), fullPage: true });
   console.log('wrote', resolve(OUT_DIR, 'portal-resolved.png'));
 
-  // 4) Flipped JWT-SVID hero: resolve + click the JWT card. Spec M6 §10.
+  // 4) Flipped JWT-SVID hero: resolve + click the JWT card to reveal claims.
   await page.goto(`${BASE}/?pace=off`);
   await page.waitForSelector('#diagram svg');
   await page.waitForFunction(() => {

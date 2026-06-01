@@ -23,7 +23,7 @@ func TestLookup_URLAndBody(t *testing.T) {
 			_, _ = w.Write([]byte(`{"shipment_id":"SHP-2049-883"}`))
 			return
 		}
-		// /trace — close the stream immediately so the goroutine exits cleanly.
+		// /trace -- close the stream immediately so the goroutine exits cleanly.
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(200)
 	}))

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# smoke-m2.sh — M2 acceptance check (spec §14.2).
+# smoke-m2.sh -- M2 acceptance check.
 #
 # Verifies the carrier service is up, reachable from the portal pod, and
 # completes the full identity round-trip:
@@ -28,7 +28,7 @@ step() { printf '\n== %s ==\n' "$*"; }
 ok()   { printf '  [ok]   %s\n' "$*"; }
 err()  { printf '  [FAIL] %s\n' "$*"; fail=$((fail+1)); }
 
-# retry CMD MAX_TRIES SLEEP_SEC — run CMD until exit 0 or MAX_TRIES reached.
+# retry CMD MAX_TRIES SLEEP_SEC -- run CMD until exit 0 or MAX_TRIES reached.
 retry() {
   local max=$1 sleep_s=$2; shift 2
   local i
@@ -49,21 +49,21 @@ step 'carrier deployment ready'
 if retry 20 3 bash -c '[[ "$(kubectl -n '"$ns"' get deploy carrier -o jsonpath="{.status.readyReplicas}" 2>/dev/null)" == "1" ]]'; then
   ok 'readyReplicas=1'
 else
-  err "carrier not ready after 60s — readyReplicas=$(kubectl -n $ns get deploy carrier -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo missing)"
+  err "carrier not ready after 60s -- readyReplicas=$(kubectl -n $ns get deploy carrier -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo missing)"
 fi
 
 step 'portal deployment ready'
 if retry 20 3 bash -c '[[ "$(kubectl -n '"$ns"' get deploy portal -o jsonpath="{.status.readyReplicas}" 2>/dev/null)" == "1" ]]'; then
   ok 'readyReplicas=1'
 else
-  err "portal not ready after 60s — readyReplicas=$(kubectl -n $ns get deploy portal -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo missing)"
+  err "portal not ready after 60s -- readyReplicas=$(kubectl -n $ns get deploy portal -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo missing)"
 fi
 
 step 'portal port-forward reachable'
 if retry 20 1 curl -sf --max-time 2 http://localhost:8080/healthz; then
   ok 'http://localhost:8080/healthz OK'
 else
-  err "portal port-forward never came up — pf_log: $(head -c 400 "$pf_log")"
+  err "portal port-forward never came up -- pf_log: $(head -c 400 "$pf_log")"
 fi
 
 step 'portal /resolve drives mTLS → JWT-SVID → SM → secret → fixture round-trip'
@@ -81,7 +81,7 @@ if retry 10 3 bash -c '
     http://localhost:8080/resolve 2>/dev/null || echo '')
   ok "shipment JSON returned (id, origin, eta present): $(printf %s "$lookup_body" | jq -c '{id:.shipment_id,origin:.origin,eta:.eta}')"
 else
-  err "lookup failed — last body: $(curl -s --max-time 15 -X POST -H 'Content-Type: application/json' -d '{"shipment_id":"SHP-2049-883"}' http://localhost:8080/resolve 2>&1 | head -c 400)"
+  err "lookup failed -- last body: $(curl -s --max-time 15 -X POST -H 'Content-Type: application/json' -d '{"shipment_id":"SHP-2049-883"}' http://localhost:8080/resolve 2>&1 | head -c 400)"
 fi
 
 step 'error path: 404 on unknown shipment'
@@ -101,10 +101,10 @@ step '/trace endpoint emits full identity round-trip during a /resolve'
 # then check that the subscriber captured every event in the round-trip.
 # Carrier events flow into portal's bus via the mTLS trace subscription and
 # arrive on the wire wrapped as `carrier.event.raw` frames whose payload.frame
-# is the original JSON event — so grep for the expected type strings inside
+# is the original JSON event -- so grep for the expected type strings inside
 # the frame value, not as top-level type=.
 trace_out=$(mktemp)
-# Note: do NOT wrap in `( ... & )` — the subshell hides $! from us and we'd
+# Note: do NOT wrap in `( ... & )` -- the subshell hides $! from us and we'd
 # end up killing the port-forward instead of this curl.
 curl -sN --max-time 8 http://localhost:8080/trace >"$trace_out" 2>/dev/null &
 sub_pid=$!

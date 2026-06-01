@@ -7,7 +7,7 @@ import (
 
 // TestRedactBearer_Short asserts the redactor leaves under-4-char inputs
 // untouched (they're not real tokens; trying to "redact" them would just
-// add noise). Plan Task 3 spec.
+// add noise).
 func TestRedactBearer_Short(t *testing.T) {
 	if got := redactBearer(""); got != "" {
 		t.Errorf("empty should stay empty, got %q", got)

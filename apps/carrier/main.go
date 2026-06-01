@@ -32,12 +32,12 @@ func run() error {
 	}
 	socketPath := os.Getenv("SPIFFE_ENDPOINT_SOCKET")
 	if socketPath == "" {
-		// In-container default — matches the volumeMount in carrier.deployment.yaml.
+		// In-container default -- matches the volumeMount in carrier.deployment.yaml.
 		// The host's hostPath /tmp/swa-agent/public is mounted at /run/swa-agent.
 		socketPath = "unix:///run/swa-agent/api.sock"
 	}
-	// M3: only this exact SPIFFE ID is allowed to terminate mTLS on :8443
-	// and subscribe to /trace on :8444. Spec §13.4 #4 (no wildcards).
+	// Only this exact portal SPIFFE ID is allowed to terminate mTLS on :8443
+	// and subscribe to /trace on :8444 (no wildcards).
 	portalSPIFFE := os.Getenv("PORTAL_SPIFFE_ID")
 	if portalSPIFFE == "" {
 		portalSPIFFE = "spiffe://idira.demo/kind-ng/ns/swa-demo/sa/portal"
@@ -47,7 +47,7 @@ func run() error {
 		syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	// Workload API client — feeds the JWT-SVID source the handler uses
+	// Workload API client -- feeds the JWT-SVID source the handler uses
 	// to talk to SM authn-jwt (unchanged from M2).
 	wlClient, err := workloadapi.New(rootCtx,
 		workloadapi.WithAddr(socketPath))
@@ -56,7 +56,7 @@ func run() error {
 	}
 	defer wlClient.Close()
 
-	// X509 source — feeds the server-side mTLS config on :8443/:8444.
+	// X509 source -- feeds the server-side mTLS config on :8443/:8444.
 	// Separate from wlClient because tlsconfig.MTLSServerConfig wants an
 	// x509svid.Source + x509bundle.Source, both of which X509Source satisfies.
 	src, err := workloadapi.NewX509Source(rootCtx,
@@ -70,7 +70,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	// AuthorizeID, never AuthorizeAny or AuthorizeMemberOf (spec §13.4 #4).
+	// AuthorizeID, never AuthorizeAny or AuthorizeMemberOf (no wildcard mTLS trust).
 	mtlsCfg := tlsconfig.MTLSServerConfig(src, src, tlsconfig.AuthorizeID(peer))
 
 	bus := NewTraceBus(256)
@@ -90,7 +90,7 @@ func run() error {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	// Main API server (8443) — mTLS, portal SPIFFE ID required.
+	// Main API server (8443) -- mTLS, portal SPIFFE ID required.
 	srv := &http.Server{
 		Addr:              ":8443",
 		Handler:           mux,
@@ -98,10 +98,10 @@ func run() error {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	// Trace server (8444) — separate mux, same mTLS config so only the portal
+	// Trace server (8444) -- separate mux, same mTLS config so only the portal
 	// can subscribe. Splitting the trace endpoint to its own port lets us keep
 	// /healthz on :8443 (still mTLS-gated for clients, but the kubelet probe
-	// only needs to reach a TLS port, not authenticate — the readinessProbe
+	// only needs to reach a TLS port, not authenticate -- the readinessProbe
 	// uses HTTPS in M3 and accepts the cert it can validate against the bundle).
 	traceMux := http.NewServeMux()
 	traceMux.HandleFunc("/trace", handleTraceSSE(bus))
@@ -131,7 +131,7 @@ func run() error {
 	}})
 	log.Printf("carrier: mTLS on %s (trace + identity on %s), socket=%s, sm=%s, secret=%s, peer=%s",
 		srv.Addr, traceSrv.Addr, socketPath, smURL, secretID, portalSPIFFE)
-	// Empty cert/key args are correct — certs come from TLSConfig.GetCertificate.
+	// Empty cert/key args are correct -- certs come from TLSConfig.GetCertificate.
 	if err := srv.ListenAndServeTLS("", ""); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}

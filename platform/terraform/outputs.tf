@@ -1,9 +1,10 @@
-# Renamed in the bundled schema: the plan called this `authn_id`, but the
-# provider exports it as `login_url` (see SCHEMA.md). This is the value the
-# server chart consumes as controlPlane.auth.loginURL (via SWA_AUTHN_ID env
-# substitution in platform/helm/swa-server.values.yaml.tmpl).
+# The bundled provider exports the server registration ID as `login_url`
+# (a plausible alternative name like `authn_id` does NOT exist in the
+# schema). This is the value the server chart consumes as
+# controlPlane.auth.loginURL (via SWA_AUTHN_ID env substitution in
+# platform/helm/swa-server.values.yaml.tmpl).
 output "login_url" {
-  description = "swa_server.kind.login_url — Conjur login URL for this SWA server registration. Substituted into the helm chart as controlPlane.auth.loginURL."
+  description = "swa_server.kind.login_url -- Conjur login URL for this SWA server registration. Substituted into the helm chart as controlPlane.auth.loginURL."
   value       = swa_server.kind.login_url
 }
 
@@ -31,7 +32,7 @@ output "server_id" {
 # --- M2 outputs (carrier identity + secret it can read) ---
 
 output "carrier_host_id" {
-  description = "SPIFFE ID of the carrier workload — matches conjur_host.carrier.name and the JWT-SVID sub claim."
+  description = "SPIFFE ID of the carrier workload -- matches conjur_host.carrier.name and the JWT-SVID sub claim."
   value       = "spiffe://${var.trust_domain}/${var.node_group}/ns/swa-demo/sa/carrier"
 }
 

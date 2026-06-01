@@ -35,7 +35,7 @@ type handlerDeps struct {
 }
 
 // parseJWTHeader extracts alg and kid from a compact JWT's first segment.
-// Returns ("", "") on any parse failure — emit-side falls back gracefully.
+// Returns ("", "") on any parse failure -- emit-side falls back gracefully.
 func parseJWTHeader(token string) (alg, kid string) {
 	parts := strings.SplitN(token, ".", 3)
 	if len(parts) < 2 {
@@ -56,8 +56,8 @@ func parseJWTHeader(token string) (alg, kid string) {
 }
 
 // decodeJWTClaims base64url-decodes the body segment of a compact JWT and
-// returns the parsed JSON object. Used to extract iss/iat/jti for the M6
-// jwt_svid.issued payload extension. Returns nil on any parse failure.
+// returns the parsed JSON object. Used to extract iss/iat/jti for the
+// jwt_svid.issued payload. Returns nil on any parse failure.
 func decodeJWTClaims(token string) map[string]any {
 	parts := strings.SplitN(token, ".", 3)
 	if len(parts) < 2 {
@@ -164,9 +164,8 @@ func handleLookup(d handlerDeps) http.HandlerFunc {
 			return
 		}
 		// REDACTION DISCIPLINE: the full bearer token (smTok) is NEVER emitted.
-		// Only redactBearer(smTok) reaches the trace bus. Spec §6.2 + validator
-		// §13.4 #4. token_len is kept for backward compat with the M5 evidence
-		// wiring that reads it for the trust-card byte count.
+		// Only redactBearer(smTok) reaches the trace bus. token_len is kept
+		// for backward compatibility with the trust-card byte count display.
 		d.bus.Emit(traceEvent{Source: "carrier", Type: "sm.authn_jwt.ok",
 			Payload: map[string]any{
 				"url":               smMeta.URL,
@@ -191,8 +190,8 @@ func handleLookup(d handlerDeps) http.HandlerFunc {
 			return
 		}
 		// NO-LEAK DISCIPLINE: only the byte COUNT (len) is emitted; the secret
-		// value itself is never placed in any payload field. Spec §6.2 +
-		// validator §13.4 #4. Enforced by TestEmitSMSecretFetchedOK_NeverContainsSecretValue.
+		// value itself is never placed in any payload field.
+		// Enforced by TestEmitSMSecretFetchedOK_NeverContainsSecretValue.
 		d.bus.Emit(traceEvent{Source: "carrier", Type: "sm.secret_fetched.ok",
 			Payload: map[string]any{
 				"url":          secretMeta.URL,

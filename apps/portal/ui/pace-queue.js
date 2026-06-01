@@ -88,7 +88,7 @@ function preemptAndFlush() {
 }
 
 function push(rawEv) {
-  // Unwrap carrier-side events wrapped as carrier.event.raw (spec M4 §...).
+  // Unwrap carrier-side events that were forwarded as carrier.event.raw.
   let ev = rawEv;
   if (ev?.type === 'carrier.event.raw' && ev.payload?.frame) {
     try { ev = JSON.parse(ev.payload.frame); } catch { /* keep raw */ }

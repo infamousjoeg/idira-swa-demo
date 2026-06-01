@@ -16,7 +16,6 @@ import (
 )
 
 // identityResp is the JSON shape returned by GET /identity on this service.
-// Spec: §5.5 of docs/superpowers/specs/2026-05-28-svid-trust-panel-design.md.
 type identityResp struct {
 	SANURI            string    `json:"san_uri"`
 	NotBefore         time.Time `json:"not_before"`
@@ -57,11 +56,10 @@ func handleIdentity(src x509svid.Source) http.HandlerFunc {
 	}
 }
 
-// certMetadata extracts the M6 cert-detail fields from an X.509 cert in a
+// certMetadata extracts the cert-detail fields from an X.509 cert in a
 // single pass: subject DN, issuer DN, hex serial, signature algorithm name,
 // and a hex-encoded SHA-256 fingerprint of the DER bytes. Mirrors the same
-// helper in apps/portal/identity.go. Spec §5 of the 2026-05-29 flip-card
-// detail-view design.
+// helper in apps/portal/identity.go.
 func certMetadata(cert *x509.Certificate) (subj, iss, serial, sigAlg, fingerprint string) {
 	if cert == nil {
 		return "", "", "", "", ""

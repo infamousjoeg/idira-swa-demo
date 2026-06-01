@@ -1,11 +1,11 @@
-# 40-policy.tf — Conjur policy: branches that scope the carrier identity +
+# 40-policy.tf -- Conjur policy: branches that scope the carrier identity +
 # the carrier api-key variable. The carrier HOST itself is NOT managed here
-# — see the lifecycle comment below.
+# -- see the lifecycle comment below.
 #
 # Provider: cyberark/conjur ~> 0.8.4. The provider's model is
-# resource-per-entity (NOT a single YAML policy load), so the M2 plan's
+# resource-per-entity (NOT a single YAML policy load), so the natural
 # `conjur_policy { policy = <<-YAML ... }` shape is translated below into
-# discrete resources. See SCHEMA.md.
+# discrete resources.
 #
 # Topology managed here:
 #
@@ -14,7 +14,7 @@
 #                                                           (variable + permission live in 50-secret.tf)
 #
 # The carrier identity branch (`data/swa/trust-domains/idira.demo/workloads`)
-# is NOT managed here — `swa_trust_domain.idira` (in 10-spiffe.tf) auto-
+# is NOT managed here -- `swa_trust_domain.idira` (in 10-spiffe.tf) auto-
 # creates the full SWA tree (trust-domains, <td>, <td>/workloads) as a
 # side-effect of trust-domain registration. Trying to also manage the
 # `workloads` branch via `conjur_policy_branch` returns 409 Conflict on
@@ -37,7 +37,7 @@
 # the value is a variable interpolation with a default (`"${var.trust_domain}"`)
 # or a reference to another `conjur_policy_branch.X.full_id`. Both forms trigger
 # "branch branch cannot be empty." So every branch attribute below must be a
-# LITERAL string — no `var.X`, no resource references. Trust domain `idira.demo`
+# LITERAL string -- no `var.X`, no resource references. Trust domain `idira.demo`
 # matches `var.trust_domain` default; if the default ever changes, these
 # literals must change in lockstep (callout in spec).
 
@@ -48,7 +48,7 @@ resource "conjur_policy_branch" "swa_demo" {
 }
 
 resource "conjur_policy_branch" "swa_demo_carrier" {
-  # Literal (NOT conjur_policy_branch.swa_demo.full_id — see provider quirk
+  # Literal (NOT conjur_policy_branch.swa_demo.full_id -- see provider quirk
   # comment at top). depends_on enforces creation order.
   branch = "data/swa-demo"
   name   = "carrier"
@@ -71,5 +71,5 @@ resource "conjur_policy_branch" "swa_demo_carrier" {
 #
 # The host's YAML body (in the script) binds it to authenticate ONLY via
 # the `secureWorkloadAccess` JWT authenticator (`restrictions: [!jwt
-# authenticator: secureWorkloadAccess]`) — equivalent in effect to the
+# authenticator: secureWorkloadAccess]`) -- equivalent in effect to the
 # `authn_descriptors[].type=jwt` we would have set on conjur_host.

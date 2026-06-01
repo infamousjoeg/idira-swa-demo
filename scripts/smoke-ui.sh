@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# smoke-ui.sh — start port-forward, run Playwright, clean up.
+# smoke-ui.sh -- start port-forward, run Playwright, clean up.
 set -euo pipefail
 
 pf_log=$(mktemp)

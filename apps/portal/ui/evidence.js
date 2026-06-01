@@ -1,4 +1,4 @@
-// evidence.js — V2 trust evidence card. Appears below the shipment result
+// evidence.js -- V2 trust evidence card. Appears below the shipment result
 // after the first successful resolve; subscribes to the shared TTL ticker.
 
 import { subscribe as subscribeTTL, formatMSS } from './ttl-ticker.js';
@@ -40,7 +40,7 @@ subscribeTrace((parsed) => {
   }
 });
 
-// Live TTL — single shared ticker.
+// Live TTL -- single shared ticker.
 subscribeTTL(({ remaining }) => {
   const el = document.getElementById('evidence-ttl');
   if (!el) return;

@@ -8,9 +8,9 @@ import (
 )
 
 // traceEvent / TraceBus / handleTraceSSE are a deliberate paste of the
-// carrier's equivalent file (apps/carrier/trace.go). Spec §3 lists "no
-// library extraction" as a non-goal; 80 lines duplicated across two
-// services is below the threshold where a shared module pays for itself.
+// carrier's equivalent file (apps/carrier/trace.go). 80 lines duplicated
+// across two services is below the threshold where a shared module pays
+// for itself; library extraction is an explicit non-goal of this demo.
 type traceEvent struct {
 	TS      time.Time      `json:"ts"`
 	Source  string         `json:"source"`

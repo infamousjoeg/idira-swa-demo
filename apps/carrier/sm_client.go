@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-// SMClient calls the Secrets Manager – SaaS REST API for JWT auth and secret fetch.
+// SMClient calls the Secrets Manager - SaaS REST API for JWT auth and secret fetch.
 // It performs zero base64 transformations on tokens.
 type SMClient struct {
 	baseURL string
@@ -20,12 +20,12 @@ type SMClient struct {
 }
 
 // AuthnJWTMeta carries request/response shape for the SM authn-jwt call.
-// Feeds the M6 sm.authn_jwt.ok trace payload (see handler.go) and the
-// SM-Token card back. Spec §6 of the 2026-05-29 flip-card-detail-view design.
+// Feeds the sm.authn_jwt.ok trace payload (see handler.go) and the
+// SM-Token card back.
 //
 // Token bytes are deliberately NOT captured here -- the bearer is returned
 // alongside as a separate string and redacted at the emit boundary
-// (apps/carrier/handler.go via redactBearer). Validator §13.4 #4.
+// (apps/carrier/handler.go via redactBearer).
 type AuthnJWTMeta struct {
 	URL             string `json:"url"`
 	Method          string `json:"method"`
@@ -36,7 +36,7 @@ type AuthnJWTMeta struct {
 
 // FetchSecretMeta carries request/response shape for the SM secret-fetch
 // call. The secret value itself is returned separately as []byte and never
-// appears in this struct -- only its byte count. Spec §6 + validator §13.4 #4.
+// appears in this struct -- only its byte count.
 type FetchSecretMeta struct {
 	URL         string `json:"url"`
 	Method      string `json:"method"`
@@ -55,7 +55,7 @@ func NewSMClient(baseURL string) *SMClient {
 }
 
 // AuthnJWT exchanges a JWT-SVID at the secureWorkloadAccess authenticator for an
-// SM access token. The returned string is the response body verbatim — SM
+// SM access token. The returned string is the response body verbatim -- SM
 // already base64-encodes it because of the Accept-Encoding: base64 header.
 //
 // Returns (token, meta, err). meta is populated even on error paths where
@@ -95,7 +95,7 @@ func (c *SMClient) AuthnJWT(ctx context.Context, jwtSVID string) (string, *Authn
 // Returns (bytes, meta, err). meta is populated even on error paths where
 // possible. Bytes count is the length of the response body; the value bytes
 // are deliberately NOT stored in meta -- callers must use the returned
-// []byte for the actual secret. Validator §13.4 #4.
+// []byte for the actual secret.
 func (c *SMClient) FetchSecret(ctx context.Context, smToken, variableID string) ([]byte, *FetchSecretMeta, error) {
 	u := c.baseURL + "/api/secrets/conjur/variable/" + url.PathEscape(variableID)
 	meta := &FetchSecretMeta{URL: u, Method: http.MethodGet, SecretID: variableID, PolicyScope: variableID}

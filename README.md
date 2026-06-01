@@ -1,6 +1,6 @@
 # Idira SWA Demo
 
-A Mac-laptop demo of **Palo Alto Networks' Idira Secure Workload Access (SWA)**: a real workload fetches a real secret from CyberArk Secrets Manager – SaaS without ever holding a static credential. The UI splits left/right so you can *watch* the identity exchange happen on every click.
+A Mac-laptop demo of **Palo Alto Networks' Idira Secure Workload Access (SWA)**: a real workload fetches a real secret from CyberArk Secrets Manager - SaaS without ever holding a static credential. The UI splits left/right so you can *watch* the identity exchange happen on every click.
 
 ![Portal split view. Left pane shows the Praetor Logistics shipment lookup form with a plain-English trust evidence card; right pane shows the live SPIFFE trust diagram fully walked, with carets visible in the top-right of every lit card marking them as click-to-flip detail targets](docs/img/portal-resolved.png)
 
@@ -19,7 +19,7 @@ The 60-second version, just to keep reading:
 - **Two flavors of identity.** SPIFFE issues two kinds of credentials, called **SVIDs** (SPIFFE Verifiable IDs):
   - **X.509-SVID** is a short-lived TLS certificate. Used for **mTLS** (mutual TLS) between services: both sides present a SVID and verify the other's SPIFFE ID before any application data flows.
   - **JWT-SVID** is a short-lived signed JWT. Used to authenticate to systems that speak HTTP/REST (like Secrets Manager), where you can't do TLS mutual auth but you *can* present a signed token.
-- **Where Idira fits.** Idira SWA is Palo Alto Networks' commercial SPIFFE implementation: a control plane on the CyberArk Secrets Manager – SaaS tenant, plus an in-cluster server + agent that issue SVIDs to your workloads. This demo runs the whole stack end-to-end on a single kind cluster.
+- **Where Idira fits.** Idira SWA is Palo Alto Networks' commercial SPIFFE implementation: a control plane on the CyberArk Secrets Manager - SaaS tenant, plus an in-cluster server + agent that issue SVIDs to your workloads. This demo runs the whole stack end-to-end on a single kind cluster.
 
 That's all you need. If you want to go deeper into what attestation actually is, how trust domains work, or why JWT-SVID audience claims matter, the visualizations at [thesecretlivesofidentity.com](https://thesecretlivesofidentity.com) are the fastest way in.
 
@@ -65,7 +65,7 @@ What's *not* present anywhere: a hardcoded `API_KEY=…` env var, a mounted secr
 - A way to load `.envrc` into your shell. [`direnv`](https://direnv.net/) is recommended (`brew install direnv` plus `eval "$(direnv hook zsh)"` in your shell rc, then `direnv allow` in this directory). Without it you must `source .envrc` manually in every new shell before running `make` -- `make doctor` will fail loudly if the env isn't loaded.
 - `node` ≥ 18 (for the headless Playwright smoke test).
 - A `swa-release-1.0.4/` bundle in this directory (gitignored vendor drop from CyberArk, not in this repo).
-- A CyberArk Secrets Manager – SaaS tenant with a Service User you can authenticate as. Copy `.envrc.example` to `.envrc` and set `PANW_SM_TENANT` (your SM SaaS subdomain) and `CONCEAL_NAMESPACE` (the Keychain path where you've stored the Service User credentials).
+- A CyberArk Secrets Manager - SaaS tenant with a Service User you can authenticate as. Copy `.envrc.example` to `.envrc` and set `PANW_SM_TENANT` (your SM SaaS subdomain) and `CONCEAL_NAMESPACE` (the Keychain path where you've stored the Service User credentials).
 
 **No secrets in `.envrc`.** Service User credentials live in the macOS Keychain via [Conceal](https://github.com/infamousjoeg/conceal), under `${CONCEAL_NAMESPACE}/client_id` and `${CONCEAL_NAMESPACE}/client_secret`. Every tenant-touching command is wrapped in [`summon -p conceal_summon`](https://cyberark.github.io/summon), which injects them as env vars for that subprocess only. They're never on disk in cleartext and never visible to `ps`.
 
@@ -128,7 +128,7 @@ Identity OAuth tokens are ≤15 min; SM access tokens are ~8 min. Every Make tar
 
 Three layers:
 
-1. **Control plane: CyberArk Secrets Manager – SaaS.** Holds the SPIFFE hierarchy (trust domain → server group → node group → server), signs SVIDs, holds the secret. Managed declaratively via two Terraform providers: [`cyberark/swa`](https://registry.terraform.io/providers/cyberark/swa/latest) (bundled, SPIFFE platform layer) and [`cyberark/conjur`](https://registry.terraform.io/providers/cyberark/conjur/latest) (public registry, Conjur policy / authenticator / secret).
+1. **Control plane: CyberArk Secrets Manager - SaaS.** Holds the SPIFFE hierarchy (trust domain → server group → node group → server), signs SVIDs, holds the secret. Managed declaratively via two Terraform providers: [`cyberark/swa`](https://registry.terraform.io/providers/cyberark/swa/latest) (bundled, SPIFFE platform layer) and [`cyberark/conjur`](https://registry.terraform.io/providers/cyberark/conjur/latest) (public registry, Conjur policy / authenticator / secret).
 2. **SWA Server (in-cluster Deployment).** Authenticates to the control plane via projected SA token. Listens on `:8443` (gRPC for agents) and `:8080` (web). Holds the cluster's PSAT trust anchor.
 3. **SWA Agent (in-cluster DaemonSet).** Per-node. Mints SVIDs for workloads. Exposes a SPIFFE Workload API socket at `/tmp/swa-agent/public/api.sock` via `hostPath` so co-located workload pods can fetch SVIDs without RPCs leaving the node.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# doctor.sh — verify M1 prerequisites. Exits 0 iff every check passes.
+# doctor.sh -- verify M1 prerequisites. Exits 0 iff every check passes.
 set -euo pipefail
 
 fail=0
@@ -7,7 +7,7 @@ fail=0
 check_cmd() {
   local cmd=$1 hint=$2
   if ! command -v "$cmd" >/dev/null 2>&1; then
-    printf '  [MISSING] %-12s — %s\n' "$cmd" "$hint"
+    printf '  [MISSING] %-12s -- %s\n' "$cmd" "$hint"
     fail=$((fail+1))
   else
     printf '  [ok]      %-12s\n' "$cmd"
@@ -17,7 +17,7 @@ check_cmd() {
 check_path() {
   local path=$1 hint=$2
   if [[ ! -e "$path" ]]; then
-    printf '  [MISSING] %-30s — %s\n' "$path" "$hint"
+    printf '  [MISSING] %-30s -- %s\n' "$path" "$hint"
     fail=$((fail+1))
   else
     printf '  [ok]      %-30s\n' "$path"
@@ -28,7 +28,7 @@ check_arch() {
   local arch
   arch=$(uname -m)
   if [[ "$arch" != "arm64" ]]; then
-    printf '  [WRONG]   uname -m == %s — M1 plan targets Apple Silicon (arm64)\n' "$arch"
+    printf '  [WRONG]   uname -m == %s -- this demo targets Apple Silicon (arm64)\n' "$arch"
     fail=$((fail+1))
   else
     printf '  [ok]      apple-silicon (%s)\n' "$arch"
@@ -68,9 +68,9 @@ echo 'Non-secret env:'
 for v in PANW_SM_TENANT CONCEAL_NAMESPACE; do
   if [[ -z "${!v:-}" ]]; then
     if [[ -f .envrc ]]; then
-      printf '  [MISSING] $%s — .envrc exists but is not loaded into this shell; run `direnv allow` or `source .envrc`\n' "$v"
+      printf '  [MISSING] $%s -- .envrc exists but is not loaded into this shell; run `direnv allow` or `source .envrc`\n' "$v"
     else
-      printf '  [MISSING] $%s — copy .envrc.example to .envrc, fill in values, then `direnv allow` or `source .envrc`\n' "$v"
+      printf '  [MISSING] $%s -- copy .envrc.example to .envrc, fill in values, then `direnv allow` or `source .envrc`\n' "$v"
     fi
     fail=$((fail+1))
   else
@@ -86,12 +86,12 @@ if [[ -n "${CONCEAL_NAMESPACE:-}" ]]; then
     if conceal get "$path" >/dev/null 2>&1; then
       printf '  [ok]      conceal:%s\n' "$path"
     else
-      printf '  [MISSING] conceal:%s — run `conceal set %s <value>`\n' "$path" "$path"
+      printf '  [MISSING] conceal:%s -- run `conceal set %s <value>`\n' "$path" "$path"
       fail=$((fail+1))
     fi
   done
 else
-  printf '  [skip]    CONCEAL_NAMESPACE not set — cannot check keychain paths\n'
+  printf '  [skip]    CONCEAL_NAMESPACE not set -- cannot check keychain paths\n'
 fi
 
 echo
@@ -106,7 +106,7 @@ if [[ -n "${PANW_SM_TENANT:-}" ]]; then
     fail=$((fail+1))
   fi
 else
-  printf '  [skip]    PANW_SM_TENANT not set — cannot probe discovery\n'
+  printf '  [skip]    PANW_SM_TENANT not set -- cannot probe discovery\n'
 fi
 
 echo

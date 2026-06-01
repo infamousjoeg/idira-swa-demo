@@ -11,10 +11,9 @@ spec:
     metadata:
       labels: {app: portal}
     spec:
-      # ServiceAccount `portal` is declared in platform/k8s/portal.sa.yaml
-      # (extracted from the retired M2 portal-stub manifest). SPIFFE ID
-      # spiffe://idira.demo/kind-ng/ns/swa-demo/sa/portal — the carrier's
-      # mTLS AuthorizeID matches this exactly.
+      # ServiceAccount `portal` is declared in platform/k8s/portal.sa.yaml.
+      # SPIFFE ID: spiffe://idira.demo/kind-ng/ns/swa-demo/sa/portal -- the
+      # carrier's mTLS AuthorizeID matches this exactly.
       serviceAccountName: portal
       containers:
         - name: portal

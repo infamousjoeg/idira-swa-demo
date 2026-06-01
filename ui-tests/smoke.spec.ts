@@ -127,7 +127,7 @@ test('ttl counts down live and stays in sync between panes', async ({ page }) =>
 
   const t0Right = await page.locator('#jwt-ttl').textContent();
   const t0Left  = await page.locator('#evidence-ttl').textContent();
-  // Same value (within 1 s) at the same instant — they share a ticker.
+  // Same value (within 1 s) at the same instant -- they share a ticker.
   expect(t0Right).toBe(t0Left);
 
   await page.waitForTimeout(2200);
@@ -143,7 +143,7 @@ test('no AI-generation markers in diagram, evidence, inspector chrome, or card b
   await page.click('button.cta');
   await expect(page.locator('#evidence')).toBeVisible({ timeout: 5000 });
 
-  // M6: flip the JWT card so the back content is in the DOM for the brand-purity scan.
+  // Flip the JWT card so the back content is in the DOM for the brand-purity scan.
   await expect(page.locator('#jwt-rect')).toHaveClass(/stage-rect--hero/, { timeout: 5000 });
   await page.locator('#jwt-rect-host').click();
   await page.waitForTimeout(300);
@@ -218,7 +218,7 @@ test('carrier unreachable: mtls stage shows error, evidence stays hidden', async
     // Error caption visible somewhere in the diagram.
     await expect(page.locator('#mtls-line-err-caption')).toBeVisible();
 
-    // Evidence card MUST stay hidden — we never reached sm.secret_fetched.ok.
+    // Evidence card MUST stay hidden -- we never reached sm.secret_fetched.ok.
     await expect(page.locator('#evidence')).toBeHidden();
   } finally {
     execSync('kubectl -n swa-demo scale deploy/carrier --replicas=1', { stdio: 'pipe' });
@@ -284,8 +284,10 @@ test('SKIP collapses the paced walk to instant completion', async ({ page }) => 
   await expect(page.locator('button.cta')).toHaveText('RESOLVE SECRET', { timeout: 1000 });
 });
 
-// === M6 flip-card behavior coverage ===
-// Spec docs/superpowers/specs/2026-05-29-flip-card-detail-view-design.md.
+// === Flip-card behavior coverage ===
+// Each card has a front (live data) and a back (raw detail view). Clicking
+// the card flips it; clicking another card or starting a new resolve
+// auto-unflips any open card.
 
 type CardCase = { id: string; expect: RegExp[] };
 const CARDS: CardCase[] = [
@@ -341,8 +343,8 @@ test('new resolve auto-unflips any open card', async ({ page }) => {
 });
 
 test('SM back never displays the full bearer token', async ({ page }) => {
-  // Validator §13.4 #4: redaction discipline is enforced at the Go wire
-  // boundary (apps/carrier/handler.go via redactBearer before bus.Emit).
+  // Redaction discipline is enforced at the Go wire boundary
+  // (apps/carrier/handler.go via redactBearer before bus.Emit).
   // This smoke is the end-to-end backstop -- a regression that lets the
   // full bearer through fails here even if backend unit tests pass.
   await page.goto('/?pace=off');

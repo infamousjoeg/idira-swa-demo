@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# kind-oidc.sh — output kind cluster's OIDC discovery + JWKS as a flat JSON
+# kind-oidc.sh -- output kind cluster's OIDC discovery + JWKS as a flat JSON
 # object, for consumption by Terraform's `external` data source.
 #
 # Output shape:
