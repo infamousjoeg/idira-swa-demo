@@ -56,9 +56,20 @@ func (c *CarrierClient) Lookup(ctx context.Context, shipmentID string) ([]byte, 
 	if !shipmentIDRE.MatchString(shipmentID) {
 		return nil, 0, fmt.Errorf("invalid shipment id: %q", shipmentID)
 	}
-	// Forward carrier trace concurrently for the lifetime of the lookup.
-	traceCtx, cancelTrace := context.WithCancel(ctx)
-	defer cancelTrace()
+	// Forward carrier trace for the lifetime of the lookup PLUS a brief
+	// grace period after we return. Without the grace, ~5% of resolves
+	// drop the carrier's tail-end events (sm.secret_fetched.ok and
+	// carrier.lookup.ok, emitted just before the /lookup response is
+	// written) because cancelling traceCtx the instant Lookup returns
+	// races against our re-emit goroutine reading those bytes off TCP.
+	// Detach from ctx so the parent's cancellation (r.Context() fires
+	// as soon as handleResolve returns) does not collapse the grace
+	// period; still honor parent for early termination (client disconnect)
+	// via context.AfterFunc.
+	traceCtx, cancelTrace := context.WithCancel(context.Background())
+	stopOnParent := context.AfterFunc(ctx, cancelTrace)
+	defer stopOnParent()
+	defer time.AfterFunc(500*time.Millisecond, cancelTrace)
 	go c.streamCarrierTrace(traceCtx)
 
 	c.bus.Emit(traceEvent{Source: "portal", Type: "mtls.handshake.start",
