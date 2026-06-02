@@ -204,9 +204,10 @@ up-m2: up-m1 build-apps deploy-apps tf-apply-app smoke-m2 ## Full M2 deploy + sm
 
 .PHONY: portforward smoke-m3 up smoke readme-shots
 
-portforward: ## Forward portal :8080 to localhost (blocks)
-	@echo 'Portal at http://localhost:8080 -- Ctrl+C to stop'
-	kubectl -n swa-demo port-forward svc/portal 8080:8080
+PORT ?= 8080
+portforward: ## Forward portal to localhost:$(PORT) (override with PORT=, blocks)
+	@echo 'Portal at http://localhost:$(PORT) -- Ctrl+C to stop'
+	kubectl -n swa-demo port-forward svc/portal $(PORT):8080
 
 readme-shots: ## Capture docs/img/*.png from a live portal (uses :18080)
 	@echo 'Capturing README images...'
