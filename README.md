@@ -73,6 +73,8 @@ What's *not* present anywhere: a hardcoded `API_KEY=…` env var, a mounted secr
 
 ---
 
+**First time on this laptop?** Run `make setup` for a guided walkthrough that installs missing tools (with your consent), builds `.envrc`, and stores your CyberArk Service User credentials in the macOS Keychain. The rest of this section assumes that has been done.
+
 ## Quick start
 
 ```bash

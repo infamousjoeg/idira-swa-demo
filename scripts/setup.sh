@@ -2,6 +2,12 @@
 # setup.sh -- guided interactive prereq onboarding for the SWA demo.
 # Six phases: greet/arch, tools, .envrc, re-exec, conceal, verify.
 
+# The script prints many single-quoted strings that contain literal backticks
+# and `$VAR` text -- these are user-facing instructions (e.g. "run `direnv
+# allow`", "$CONCEAL_NAMESPACE is not set"), not shell expressions. Disable
+# SC2016 file-wide so we don't have to double-quote and re-escape each line.
+# shellcheck disable=SC2016
+
 set -euo pipefail
 
 # Sentinel: set to 1 on the second pass after phase 4 re-execs us under the
@@ -283,8 +289,13 @@ phase4_reexec() {
   if (( SWA_SETUP_REEXECED )); then
     return 0
   fi
+  set +u
+  # .envrc is generated at run time (phase 3) or vendored by the user, so
+  # the linter has no fixed file to follow; suppress its "not following"
+  # warning rather than guess a stand-in path.
   # shellcheck disable=SC1091
-  set +u; source ./.envrc; set -u
+  source ./.envrc
+  set -u
   export SWA_SETUP_REEXECED=1
   # Re-exec with the original argv so user flags (--skip-conceal,
   # --print-only, --yes, ...) persist into the second pass. Guard the
@@ -327,7 +338,8 @@ phase5_conceal() {
 # conceal handles the masked secret prompt itself. This script never reads,
 # stores, or echoes the secret value.
 conceal_set_one() {
-  local key=$1 path="${CONCEAL_NAMESPACE}/${key}"
+  local key=$1
+  local path="${CONCEAL_NAMESPACE}/${key}"
 
   if conceal get "$path" >/dev/null 2>&1; then
     note ''
