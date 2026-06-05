@@ -45,8 +45,60 @@ while (( $# > 0 )); do
   shift
 done
 
+# ---- color/tty helpers --------------------------------------------------
+if [[ -t 1 ]]; then
+  C_RESET=$'\033[0m'
+  C_DIM=$'\033[2m'
+  C_BOLD=$'\033[1m'
+  C_RED=$'\033[31m'
+  C_GREEN=$'\033[32m'
+  C_YELLOW=$'\033[33m'
+else
+  C_RESET='' C_DIM='' C_BOLD='' C_RED='' C_GREEN='' C_YELLOW=''
+fi
+
+header()    { printf '\n%s== %s ==%s\n' "$C_BOLD" "$1" "$C_RESET"; }
+ok()        { printf '  %s[ok]%s        %s\n' "$C_GREEN" "$C_RESET" "$1"; }
+miss()      { printf '  %s[MISSING]%s   %s\n' "$C_YELLOW" "$C_RESET" "$1"; }
+fail()      { printf '  %s[FAIL]%s      %s\n' "$C_RED" "$C_RESET" "$1"; }
+note()      { printf '  %s\n' "$1"; }
+
 # ---- phases (stubs; filled in by later tasks) ---------------------------
-phase1_greet_and_arch()   { echo '[phase 1 stub] greet + arch'; }
+phase1_greet_and_arch() {
+  # ANSI Shadow figlet rendering of "SWA". Subtitle dimmed in a tty.
+  cat <<EOF
+
+███████╗██╗    ██╗ █████╗
+██╔════╝██║    ██║██╔══██╗
+███████╗██║ █╗ ██║███████║
+╚════██║██║███╗██║██╔══██║
+███████║╚███╔███╔╝██║  ██║
+╚══════╝ ╚══╝╚══╝ ╚═╝  ╚═╝
+EOF
+  printf '%s        Secure Workload Access%s\n\n' "$C_DIM" "$C_RESET"
+
+  cat <<'EOF'
+This script walks you through installing the demo's prerequisites and
+wiring up your local environment. It will:
+  - Ask before installing any tool via Homebrew.
+  - Build a .envrc from .envrc.example (no secrets).
+  - Invoke `conceal set` so you can store your CyberArk Service User
+    credentials in the macOS Keychain. Conceal prompts you for those
+    directly; this script never sees them.
+
+It will not touch your SM tenant or run any deploy step.
+
+EOF
+
+  header 'Phase 1: host check'
+  local arch
+  arch=$(uname -m)
+  if [[ "$arch" != "arm64" ]]; then
+    fail "uname -m == $arch -- this demo targets Apple Silicon (arm64)"
+    exit 1
+  fi
+  ok "apple-silicon ($arch)"
+}
 phase2_tools()            { (( SKIP_TOOLS ))   && return 0; echo '[phase 2 stub] tools'; }
 phase3_envrc()            { (( SKIP_ENVRC ))   && return 0; echo '[phase 3 stub] .envrc'; }
 phase4_reexec()           { (( SKIP_ENVRC ))   && return 0; echo '[phase 4 stub] re-exec'; }
