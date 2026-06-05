@@ -363,7 +363,31 @@ conceal_set_one() {
     FAILED_TOOLS+=("conceal:${key}")
   fi
 }
-phase6_verify()           { echo '[phase 6 stub] verify'; }
+phase6_verify() {
+  header 'Phase 6: verify'
+  local rc=0
+  ./scripts/doctor.sh || rc=$?
+
+  # Summary of anything we couldn't (or wouldn't) handle. Arrays are
+  # unconditionally `=()` at the top of the script, so reads survive `set -u`
+  # even when nothing was skipped or failed.
+  printf '\n'
+  if (( ${#SKIPPED_TOOLS[@]} > 0 )); then
+    note "You skipped: ${SKIPPED_TOOLS[*]}"
+  fi
+  if (( ${#FAILED_TOOLS[@]} > 0 )); then
+    printf '  %sFailures during setup: %s%s\n' "$C_RED" "${FAILED_TOOLS[*]}" "$C_RESET"
+  fi
+
+  if (( rc == 0 )); then
+    printf '\n%sAll set.%s Next steps:\n' "$C_GREEN" "$C_RESET"
+    note '  source .envrc          # if direnv is not handling it'
+    note '  make up-m1             # deploy SWA against your tenant'
+  else
+    printf '\n%sDoctor still flagged issues above.%s Address them, then re-run `make doctor`.\n' "$C_YELLOW" "$C_RESET"
+  fi
+  return "$rc"
+}
 
 main() {
   if (( SWA_SETUP_REEXECED == 0 )); then
