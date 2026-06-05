@@ -3,7 +3,7 @@
 ![License](https://img.shields.io/github/license/infamousjoeg/idira-swa-demo)
 ![Demo only](https://img.shields.io/badge/status-demo--only-orange)
 
-> A Mac laptop demo of CyberArk Secure Workload Access: real workloads fetch real secrets via SPIFFE identity, with zero static credentials.
+> A Mac laptop demo of Idira Secure Workload Access: real workloads fetch real secrets via SPIFFE identity, with zero static credentials.
 
 ![Portal split view with the resolved trust diagram fully walked](docs/img/portal-resolved.png)
 
@@ -23,7 +23,7 @@
 
 ## What this is
 
-A self-contained sandbox that runs the full Palo Alto Networks Secure Workload Access (SWA) stack on a single kind cluster on your Mac. Two Go demo apps (`carrier` and `portal`) authenticate to a real CyberArk Secrets Manager SaaS tenant using short-lived SPIFFE-issued credentials and fetch a real secret. No API key is ever baked into an image, mounted from a file, or typed into a config. Time from `make up` to a running portal is about four minutes on a clean clone.
+A self-contained sandbox that runs the full Idira Secure Workload Access (SWA) stack on a single kind cluster on your Mac. Two Go demo apps (`carrier` and `portal`) authenticate to a real Idira Secrets Manager - SaaS tenant using short-lived SPIFFE-issued credentials and fetch a real secret. No API key is ever baked into an image, mounted from a file, or typed into a config. Time from `make up` to a running portal is about four minutes on a clean clone.
 
 The point is to make the identity exchange visible. The portal UI splits left and right so you can watch each SVID get issued, each mTLS handshake complete, and each Secrets Manager REST call land, in real time, on every click. Click any lit card in the trust diagram to flip it open and see decoded claims, full certificate metadata, or the raw bearer-token exchange.
 
@@ -31,7 +31,7 @@ New to SPIFFE or workload identity? Start with [Concepts](https://github.com/inf
 
 ## Quick start
 
-**First time on this laptop?** Run `make setup` once. It walks you through installing missing tools, building `.envrc`, and storing your CyberArk Service User credentials in the macOS Keychain. See [First-time setup](https://github.com/infamousjoeg/idira-swa-demo/wiki/First-time-setup) for the full walkthrough.
+**First time on this laptop?** Run `make setup` once. It walks you through installing missing tools, building `.envrc`, and storing your Idira Service User credentials in the macOS Keychain. See [First-time setup](https://github.com/infamousjoeg/idira-swa-demo/wiki/First-time-setup) for the full walkthrough.
 
 ```bash
 make setup                          # one-time guided onboarding
@@ -54,8 +54,8 @@ When you are done, `make down` tears the cluster and the tenant Terraform state 
 - macOS on Apple Silicon. The bundled SWA container images are `arm64v8`-only.
 - Docker (or OrbStack), `kind`, `kubectl`, `helm`, `terraform`, `jq`, `summon`, `conceal`, `direnv`, and Node 18+ on PATH.
 - Homebrew. `make setup` uses it to install anything missing above, with your consent at each step.
-- A `swa-release-1.0.4/` vendor bundle from CyberArk in the repo root (gitignored; obtain separately).
-- A CyberArk Secrets Manager SaaS tenant and a Service User you can authenticate as.
+- A `swa-release-1.0.4/` vendor bundle from Idira in the repo root (gitignored; obtain separately).
+- An Idira Secrets Manager - SaaS tenant and a Service User you can authenticate as.
 - An `.envrc` with `PANW_SM_TENANT` and `CONCEAL_NAMESPACE` set (created by `make setup`).
 
 Hand-installing instead of running `make setup`? See [Manual prereqs](https://github.com/infamousjoeg/idira-swa-demo/wiki/Manual-prereqs).
@@ -70,7 +70,7 @@ Full screenshot walkthrough and wire-trace breakdown: [Portal tour](https://gith
 
 ## Architecture
 
-Three layers cooperate to issue and validate identity. A CyberArk Secrets Manager SaaS tenant is the control plane: it holds the SPIFFE trust hierarchy, signs SVIDs, and stores the demo secret. An in-cluster SWA Server authenticates to the control plane and serves agents over gRPC. A SWA Agent DaemonSet runs on every node, mints SVIDs for local workloads, and exposes them through a unix-socket Workload API. The demo apps (`carrier` and `portal`) consume those SVIDs to do mTLS and to mint JWT-SVIDs for the Secrets Manager call. The [Architecture deep-dive](https://github.com/infamousjoeg/idira-swa-demo/wiki/Architecture) on the Wiki covers the SPIFFE hierarchy, node attestation modes (`k8s_psat` and `x509pop`), and the control-plane API in full.
+Three layers cooperate to issue and validate identity. An Idira Secrets Manager - SaaS tenant is the control plane: it holds the SPIFFE trust hierarchy, signs SVIDs, and stores the demo secret. An in-cluster SWA Server authenticates to the control plane and serves agents over gRPC. A SWA Agent DaemonSet runs on every node, mints SVIDs for local workloads, and exposes them through a unix-socket Workload API. The demo apps (`carrier` and `portal`) consume those SVIDs to do mTLS and to mint JWT-SVIDs for the Secrets Manager call. The [Architecture deep-dive](https://github.com/infamousjoeg/idira-swa-demo/wiki/Architecture) on the Wiki covers the SPIFFE hierarchy, node attestation modes (`k8s_psat` and `x509pop`), and the control-plane API in full.
 
 ```
 +-------------------------------+
@@ -120,8 +120,8 @@ apps/                  Go services (carrier, portal) consumed by the demo
 docs/                  images and reference companions for the README
 platform/              Helm values, Kubernetes manifests, Terraform sources
 scripts/               setup, doctor, deploy, and tenant-token helpers
-swa-docs/              mirrored upstream CyberArk SWA docs (read-only)
-swa-release-1.0.4/     vendor bundle from CyberArk (gitignored; obtain separately)
+swa-docs/              mirrored upstream Idira SWA docs (read-only)
+swa-release-1.0.4/     vendor bundle from Idira (gitignored; obtain separately)
 ui-tests/              Playwright headless smoke test driving the portal
 out/                   generated artifacts from make targets (gitignored)
 ```

@@ -45,7 +45,7 @@ docker version --format '{{.Server.Version}}'   # should print, e.g., 29.5.2
 
 For Path B (full deploy) you additionally need:
 
-- A CyberArk Secrets Manager - SaaS tenant with **Secure Workload Access** entitlement and the Secrets Manager **Admin** role.
+- An Idira Secrets Manager - SaaS tenant with **Secure Workload Access** entitlement and the Secrets Manager **Admin** role.
 - A bearer token (the docs call it `TOKEN`); the auth flow is documented at [docs.cyberark.com → Authenticate user](https://docs.cyberark.com/early-release/swa/en/content/developer/conjur_api_authenticate_user.htm).
 - Your tenant subdomain. The SWA API base is `https://<subdomain>.secretsmgr.cyberark.cloud`.
 

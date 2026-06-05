@@ -15,8 +15,8 @@ only the GitHub advisory path remains).
 
 ## Out of scope
 
-- Issues in upstream CyberArk Secure Workload Access itself. Report
-  those to CyberArk.
+- Issues in upstream Idira Secure Workload Access itself. Report
+  those to Idira.
 - Issues in the bundled demo workload images (`shipper`, `carrier`,
   `portal`) that depend on misconfiguring the demo (e.g., exposing
   the portal to the internet).
