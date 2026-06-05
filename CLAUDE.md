@@ -1,6 +1,6 @@
 # Maintainer notes -- idira-swa-demo
 
-This file is project guidance for anyone (human or otherwise) working in this repo. It documents the structural facts about the CyberArk Secure Workload Access (SWA) release distribution that this sandbox demonstrates: what the release contains, how to deploy it locally, and how the in-cluster components fit together. The information is not duplicated in README.md (user-facing) or DEPLOY_MACOS.md (step-by-step walkthrough); both link back here for component-level depth.
+This file is project guidance for anyone (human or otherwise) working in this repo. It documents the structural facts about the CyberArk Secure Workload Access (SWA) release distribution that this sandbox demonstrates: what the release contains, how to deploy it locally, and how the in-cluster components fit together. The information is not duplicated in README.md (user-facing) or docs/under-the-hood.md (step-by-step walkthrough); both link back here for component-level depth.
 
 ## Repository nature
 
@@ -28,7 +28,7 @@ do I get there"; it does not touch the tenant or run any deploy step.
 
 ## Where the knowledge lives
 
-- **[`DEPLOY_MACOS.md`](DEPLOY_MACOS.md)** -- runnable end-to-end Mac walkthrough that ties the bundle artifacts to a kind cluster, with both a sandbox path (no tenant) and a full-deploy path (against a Secrets Manager - SaaS tenant). This is the right starting point for any "make SWA work on this laptop" request.
+- **[`docs/under-the-hood.md`](docs/under-the-hood.md)** -- runnable end-to-end Mac walkthrough that ties the bundle artifacts to a kind cluster, with both a sandbox path (no tenant) and a full-deploy path (against a Secrets Manager - SaaS tenant). This is the right starting point for any "make SWA work on this laptop" request.
 - **[`swa-docs/INDEX.md`](swa-docs/INDEX.md)** -- local mirror of the upstream early-release docs (12 pages from `docs.cyberark.com/early-release/swa/.../conjurcloud/`). Each page in `swa-docs/pages/` keeps its upstream URL in its frontmatter under `source:`. Prefer reading these over re-fetching; if a question turns on something that might be newer than the mirror, refetch the page named in the frontmatter rather than guessing.
 - **[`swa-docs/raw/`](swa-docs/raw/)** -- original rendered HTML for each crawled page (JSON-encoded strings, captured via Playwright since the docs site is a JS-rendered MadCap Flare SPA). Keep for traceability; humans should read `pages/*.md`.
 
@@ -114,7 +114,7 @@ The agent's `podLabels.swa_nodegroup` is referenced by the server's SPIFFE ID te
 
 ## Platform notes
 
-- **macOS (Apple Silicon):** use the `*-arm64v8` image tarballs. `make kind-load-images` loads both architectures into the kind node; only the arm64 ones run. Full step-by-step is in [`DEPLOY_MACOS.md`](DEPLOY_MACOS.md).
+- **macOS (Apple Silicon):** use the `*-arm64v8` image tarballs. `make kind-load-images` loads both architectures into the kind node; only the arm64 ones run. Full step-by-step is in [`docs/under-the-hood.md`](docs/under-the-hood.md).
 - **EKS:** set `setNodeNameEnv: false` on the agent. Instance-ID node names don't resolve via DNS; with `hostNetwork: true` the agent falls back to `127.0.0.1` to reach the kubelet.
 - **OpenShift:** use `push-openshift-images` (logs into the internal registry with the `oc` token) rather than `push-images`. Provide `OS_PROJECT` if not using the default `swa`.
 - **Windows:** the bash installer refuses MINGW/MSYS/CYGWIN; use `install-terraform-provider.ps1`.
