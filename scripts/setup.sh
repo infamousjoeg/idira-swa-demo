@@ -63,6 +63,34 @@ miss()      { printf '  %s[MISSING]%s   %s\n' "$C_YELLOW" "$C_RESET" "$1"; }
 fail()      { printf '  %s[FAIL]%s      %s\n' "$C_RED" "$C_RESET" "$1"; }
 note()      { printf '  %s\n' "$1"; }
 
+# ---- prompt helpers -----------------------------------------------------
+# confirm "prompt text" [default] -> returns 0 on yes, 1 on no.
+# default is "Y" or "N" (case-insensitive); empty input takes the default.
+# Respects --yes (always returns 0). Uses tr for uppercase to stay
+# compatible with bash 3.2 (macOS /bin/bash), which lacks ${var^^}.
+confirm() {
+  local prompt=$1 default=${2:-Y} ans
+  if (( ASSUME_YES )); then
+    printf '%s [auto-Y]\n' "$prompt"
+    return 0
+  fi
+  local default_upper
+  default_upper=$(printf '%s' "$default" | tr '[:lower:]' '[:upper:]')
+  local hint='[Y/n]'
+  [[ "$default_upper" == N ]] && hint='[y/N]'
+  read -r -p "$prompt $hint " ans
+  ans=${ans:-$default}
+  local ans_upper
+  ans_upper=$(printf '%s' "$ans" | tr '[:lower:]' '[:upper:]')
+  [[ "$ans_upper" == Y* ]]
+}
+
+# ---- shared state -------------------------------------------------------
+# Track skipped/failed tools for the final summary in phase 6. Initialized
+# unconditionally so `(( ${#FOO[@]} ))` reads in later phases survive `set -u`.
+SKIPPED_TOOLS=()
+FAILED_TOOLS=()
+
 # ---- phases (stubs; filled in by later tasks) ---------------------------
 phase1_greet_and_arch() {
   # ANSI Shadow figlet rendering of "SWA". Subtitle dimmed in a tty.
@@ -99,7 +127,81 @@ EOF
   fi
   ok "apple-silicon ($arch)"
 }
-phase2_tools()            { (( SKIP_TOOLS ))   && return 0; echo '[phase 2 stub] tools'; }
+phase2_tools() {
+  (( SKIP_TOOLS )) && return 0
+  header 'Phase 2: tools'
+
+  if ! command -v brew >/dev/null 2>&1; then
+    fail "Homebrew is not installed. Install it first:"
+    note '  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+    note '  See https://brew.sh for details. Then re-run `make setup`.'
+    exit 1
+  fi
+
+  # Registry: name | install-cmd (empty for docker -- print-only) | blurb
+  # The blurb prints when the tool is MISSING so the user understands what
+  # they are about to install.
+  local docker_blurb='Docker Desktop, OrbStack, and colima all work. Install one and re-run setup.'
+  local kind_blurb='Runs a local Kubernetes cluster inside Docker.'
+  local kubectl_blurb='Kubernetes CLI.'
+  local helm_blurb='Installs the SWA Server and Agent charts.'
+  local terraform_blurb='Configures the SPIFFE hierarchy and Conjur policy on the tenant.'
+  local jq_blurb='JSON parsing used throughout the deploy scripts.'
+  local envsubst_blurb='Templating used by the carrier ConfigMap render. Bundled with GNU gettext on macOS.'
+  local summon_blurb='CyberArk'\''s secret-injector. Every tenant-touching command in this demo is run as `summon -p conceal_summon -- <cmd>`, which fetches your Service User credentials from Keychain and injects them as env vars for that one subprocess. They never land on disk, never appear in `ps`, and never leak into shell history.'
+  local conceal_blurb='CyberArk'\''s Keychain wrapper. We use it to store your Service User client_id and client_secret in the macOS Keychain under a namespace you choose. Summon then reads from there at runtime via the `conceal_summon` provider. You will set the values yourself in a moment -- this script never sees them.'
+
+  check_tool docker    ''                                                  "$docker_blurb"
+  check_tool kind      'brew install kind'                                 "$kind_blurb"
+  check_tool kubectl   'brew install kubectl'                              "$kubectl_blurb"
+  check_tool helm      'brew install helm'                                 "$helm_blurb"
+  check_tool terraform 'brew install terraform'                            "$terraform_blurb"
+  check_tool jq        'brew install jq'                                   "$jq_blurb"
+  check_tool envsubst  'brew install gettext && brew link --force gettext' "$envsubst_blurb"
+  check_tool summon    'brew install summon'                               "$summon_blurb"
+  check_tool conceal   'brew install cyberark/tools/conceal'               "$conceal_blurb"
+}
+
+# check_tool <name> <install-cmd-or-empty> <blurb>
+check_tool() {
+  local name=$1 install_cmd=$2 blurb=$3
+  if command -v "$name" >/dev/null 2>&1; then
+    ok "$name"
+    return 0
+  fi
+  miss "$name"
+  printf '    %s%s%s\n' "$C_DIM" "$blurb" "$C_RESET"
+
+  if [[ -z "$install_cmd" ]]; then
+    # Docker case: no auto-install. Record as skipped and continue.
+    note '    (no auto-install -- install one of Docker Desktop, OrbStack, or colima, then re-run)'
+    SKIPPED_TOOLS+=("$name")
+    return 0
+  fi
+
+  if ! confirm "    Install via '$install_cmd'?" Y; then
+    SKIPPED_TOOLS+=("$name")
+    note "    [skipped] $name"
+    return 0
+  fi
+
+  if (( PRINT_ONLY )); then
+    printf '    [print-only] would run: %s\n' "$install_cmd"
+    return 0
+  fi
+
+  if eval "$install_cmd"; then
+    if command -v "$name" >/dev/null 2>&1; then
+      ok "$name installed"
+    else
+      fail "$name -- brew reported success but command is still missing"
+      FAILED_TOOLS+=("$name")
+    fi
+  else
+    fail "$name -- brew install exited non-zero"
+    FAILED_TOOLS+=("$name")
+  fi
+}
 phase3_envrc()            { (( SKIP_ENVRC ))   && return 0; echo '[phase 3 stub] .envrc'; }
 phase4_reexec()           { (( SKIP_ENVRC ))   && return 0; echo '[phase 4 stub] re-exec'; }
 phase5_conceal()          { (( SKIP_CONCEAL )) && return 0; echo '[phase 5 stub] conceal'; }
