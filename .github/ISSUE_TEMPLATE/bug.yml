@@ -1,0 +1,44 @@
+name: Bug report
+description: Report something that does not work as documented.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-i-tried
+    attributes:
+      label: What I tried
+      description: Which command, file, or step from the README or Wiki?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What I expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened
+      description: Paste error output if any.
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+  - type: dropdown
+    id: arch
+    attributes:
+      label: Apple Silicon?
+      options: ["yes", "no"]
+  - type: input
+    id: container-runtime
+    attributes:
+      label: Container runtime
+      description: Docker Desktop, OrbStack, or colima?
+  - type: input
+    id: commit
+    attributes:
+      label: Commit SHA
+      description: "Output of: git rev-parse HEAD"

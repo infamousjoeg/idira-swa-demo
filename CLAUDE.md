@@ -8,6 +8,24 @@ This repo is a sandbox for working with the **CyberArk Secure Workload Access (S
 
 There is no application code to build, lint, or test here. The commands below are operational: loading container images, installing charts, installing a Terraform provider.
 
+## Onboarding flow (canonical)
+
+A first-time user runs, in order:
+
+- `make setup` (interactive; six phases; installs missing tools via Homebrew
+  with consent, builds `.envrc` from `.envrc.example`, stores Service User
+  credentials in Keychain via `conceal set`, and as its final phase invokes
+  `make doctor` to verify the result).
+- `make up` (canonical deploy; M1 + M2 + M3 milestones; depends on
+  `make doctor` so it is also a safe trust-but-verify entry point).
+- `make portforward PORT=18080` (open the portal on a non-default port
+  to avoid common 8080 collisions).
+
+`make doctor` is idempotent and safe to re-run on its own at any time;
+because `make setup` and `make up` both invoke it, you rarely need to
+call it directly. `scripts/setup.sh` is the source of truth for "how
+do I get there"; it does not touch the tenant or run any deploy step.
+
 ## Where the knowledge lives
 
 - **[`DEPLOY_MACOS.md`](DEPLOY_MACOS.md)** -- runnable end-to-end Mac walkthrough that ties the bundle artifacts to a kind cluster, with both a sandbox path (no tenant) and a full-deploy path (against a Secrets Manager - SaaS tenant). This is the right starting point for any "make SWA work on this laptop" request.
