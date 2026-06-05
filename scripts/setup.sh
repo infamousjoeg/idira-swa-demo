@@ -295,7 +295,74 @@ phase4_reexec() {
     exec "$0"
   fi
 }
-phase5_conceal()          { (( SKIP_CONCEAL )) && return 0; echo '[phase 5 stub] conceal'; }
+phase5_conceal() {
+  (( SKIP_CONCEAL )) && return 0
+  header 'Phase 5: conceal (Keychain credentials)'
+
+  if ! command -v conceal >/dev/null 2>&1; then
+    miss 'conceal is not installed -- cannot store Keychain credentials'
+    note '    Install it (`brew install cyberark/tools/conceal`) then re-run:'
+    note '        make setup SETUP_FLAGS="--skip-tools --skip-envrc"'
+    SKIPPED_TOOLS+=('conceal-phase')
+    return 0
+  fi
+
+  if [[ -z "${CONCEAL_NAMESPACE:-}" ]]; then
+    miss '$CONCEAL_NAMESPACE is not set -- cannot pick Keychain paths'
+    note '    Source .envrc (or run `direnv allow`) then re-run:'
+    note '        make setup SETUP_FLAGS="--skip-tools --skip-envrc"'
+    SKIPPED_TOOLS+=('conceal-phase')
+    return 0
+  fi
+
+  local key
+  for key in client_id client_secret; do
+    conceal_set_one "$key"
+  done
+}
+
+# conceal_set_one <key>
+# Probes the keychain for <CONCEAL_NAMESPACE>/<key>; on hit, offers a default-N
+# keep/reset; on miss (or reset), invokes `conceal set <path>` directly so
+# conceal handles the masked secret prompt itself. This script never reads,
+# stores, or echoes the secret value.
+conceal_set_one() {
+  local key=$1 path="${CONCEAL_NAMESPACE}/${key}"
+
+  if conceal get "$path" >/dev/null 2>&1; then
+    note ''
+    if ! confirm "    ${path} is already set in Keychain. Reset it?" N; then
+      ok "${key} already stored"
+      return 0
+    fi
+    # fall through to set
+  fi
+
+  note ''
+  note "    Next, I will run:  conceal set ${path}"
+  note '    Conceal will prompt you for the value with masked input.'
+  note '    This script never sees what you type.'
+
+  if (( PRINT_ONLY )); then
+    printf '    [print-only] would run: conceal set %s\n' "$path"
+    return 0
+  fi
+
+  # Immediately invoke; no intermediate Y/n prompt (spec phase 5).
+  local rc=0
+  conceal set "$path" || rc=$?
+  if (( rc == 0 )); then
+    if conceal get "$path" >/dev/null 2>&1; then
+      ok "${key} stored in Keychain"
+    else
+      fail "${key} -- conceal set returned 0 but get cannot find it"
+      FAILED_TOOLS+=("conceal:${key}")
+    fi
+  else
+    fail "${key} -- conceal set exited ${rc}"
+    FAILED_TOOLS+=("conceal:${key}")
+  fi
+}
 phase6_verify()           { echo '[phase 6 stub] verify'; }
 
 main() {
