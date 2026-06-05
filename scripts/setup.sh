@@ -4,6 +4,10 @@
 
 set -euo pipefail
 
+# Sentinel: set to 1 on the second pass after phase 4 re-execs us under the
+# freshly-sourced .envrc. Defaulted here so `(( ... ))` reads survive `set -u`.
+: "${SWA_SETUP_REEXECED:=0}"
+
 # ---- flags --------------------------------------------------------------
 ASSUME_YES=0
 PRINT_ONLY=0
@@ -259,15 +263,34 @@ phase3_envrc() {
   note '    If you use direnv, run `direnv allow` in another shell. I will'
   note '    re-exec myself so phase 5 sees the new env.'
 }
-phase4_reexec()           { (( SKIP_ENVRC ))   && return 0; echo '[phase 4 stub] re-exec'; }
+phase4_reexec() {
+  (( SKIP_ENVRC )) && return 0
+  # If .envrc was missing earlier and the user picked print-only or skipped,
+  # there is nothing to source. Detect and bail quietly.
+  if [[ ! -f .envrc ]]; then
+    note '    (no .envrc on disk -- skipping re-exec; phase 5 will degrade)'
+    return 0
+  fi
+  # If we already re-execed, do not loop.
+  if (( SWA_SETUP_REEXECED )); then
+    return 0
+  fi
+  # shellcheck disable=SC1091
+  set +u; source ./.envrc; set -u
+  export SWA_SETUP_REEXECED=1
+  # Re-exec with the original argv so flags persist.
+  exec "$0" "$@"
+}
 phase5_conceal()          { (( SKIP_CONCEAL )) && return 0; echo '[phase 5 stub] conceal'; }
 phase6_verify()           { echo '[phase 6 stub] verify'; }
 
 main() {
-  phase1_greet_and_arch
-  phase2_tools
-  phase3_envrc
-  phase4_reexec
+  if (( SWA_SETUP_REEXECED == 0 )); then
+    phase1_greet_and_arch
+    phase2_tools
+    phase3_envrc
+    phase4_reexec "$@"
+  fi
   phase5_conceal
   phase6_verify
 }
