@@ -202,7 +202,63 @@ check_tool() {
     FAILED_TOOLS+=("$name")
   fi
 }
-phase3_envrc()            { (( SKIP_ENVRC ))   && return 0; echo '[phase 3 stub] .envrc'; }
+phase3_envrc() {
+  (( SKIP_ENVRC )) && return 0
+  header 'Phase 3: .envrc'
+
+  if [[ ! -f .envrc.example ]]; then
+    fail '.envrc.example not found -- run setup from the repo root'
+    exit 1
+  fi
+
+  local exists=0 has_placeholders=0
+  if [[ -f .envrc ]]; then
+    exists=1
+    if grep -q '<your-' .envrc; then
+      has_placeholders=1
+    fi
+  fi
+
+  if (( exists )) && (( ! has_placeholders )); then
+    ok '.envrc exists and looks populated'
+    return 0
+  fi
+
+  if (( exists )) && (( has_placeholders )); then
+    miss '.envrc exists but still contains placeholder strings (e.g. <your-subdomain>)'
+    if ! confirm '    Overwrite .envrc with fresh values?' N; then
+      note '    [skipped] .envrc -- leaving in place'
+      return 0
+    fi
+  else
+    note '.envrc not found -- creating from .envrc.example'
+  fi
+
+  # Prompt for values.
+  local tenant ns_default ns
+  read -r -p '    PANW_SM_TENANT (your SM SaaS subdomain, e.g. "acme"): ' tenant
+  if [[ -z "$tenant" ]]; then
+    fail 'PANW_SM_TENANT is required'
+    exit 1
+  fi
+  ns_default="${tenant}/swa-demo"
+  read -r -p "    CONCEAL_NAMESPACE [${ns_default}]: " ns
+  ns=${ns:-$ns_default}
+
+  if (( PRINT_ONLY )); then
+    printf '    [print-only] would write .envrc with PANW_SM_TENANT=%s CONCEAL_NAMESPACE=%s\n' "$tenant" "$ns"
+    return 0
+  fi
+
+  # Atomic write: .envrc.tmp -> .envrc.
+  sed -e "s|<your-subdomain>|${tenant}|" \
+      -e "s|<your-keychain-namespace>|${ns}|" \
+      .envrc.example > .envrc.tmp
+  mv .envrc.tmp .envrc
+  ok ".envrc written (PANW_SM_TENANT=${tenant}, CONCEAL_NAMESPACE=${ns})"
+  note '    If you use direnv, run `direnv allow` in another shell. I will'
+  note '    re-exec myself so phase 5 sees the new env.'
+}
 phase4_reexec()           { (( SKIP_ENVRC ))   && return 0; echo '[phase 4 stub] re-exec'; }
 phase5_conceal()          { (( SKIP_CONCEAL )) && return 0; echo '[phase 5 stub] conceal'; }
 phase6_verify()           { echo '[phase 6 stub] verify'; }
