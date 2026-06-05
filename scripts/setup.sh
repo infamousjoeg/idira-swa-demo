@@ -15,6 +15,14 @@ SKIP_TOOLS=0
 SKIP_ENVRC=0
 SKIP_CONCEAL=0
 
+# Snapshot original argv before the parser eats them, so phase 4's
+# `exec "$0" "${ORIG_ARGS[@]}"` re-execs with the user's flags intact.
+# Unconditional `=()` so `set -u` survives when invoked with no args.
+ORIG_ARGS=()
+if (( $# > 0 )); then
+  ORIG_ARGS=("$@")
+fi
+
 usage() {
   cat <<'EOF'
 Usage: make setup [-- FLAGS]
@@ -278,8 +286,14 @@ phase4_reexec() {
   # shellcheck disable=SC1091
   set +u; source ./.envrc; set -u
   export SWA_SETUP_REEXECED=1
-  # Re-exec with the original argv so flags persist.
-  exec "$0" "$@"
+  # Re-exec with the original argv so user flags (--skip-conceal,
+  # --print-only, --yes, ...) persist into the second pass. Guard the
+  # expansion so `set -u` survives when ORIG_ARGS is empty.
+  if (( ${#ORIG_ARGS[@]} > 0 )); then
+    exec "$0" "${ORIG_ARGS[@]}"
+  else
+    exec "$0"
+  fi
 }
 phase5_conceal()          { (( SKIP_CONCEAL )) && return 0; echo '[phase 5 stub] conceal'; }
 phase6_verify()           { echo '[phase 6 stub] verify'; }
