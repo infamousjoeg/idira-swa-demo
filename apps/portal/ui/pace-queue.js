@@ -95,9 +95,21 @@ function push(rawEv) {
   }
   if (!ev || typeof ev.type !== 'string') return;
 
-  // Error preemption: fan out immediately, drop everything else.
+  // Error preemption: drain any queued non-error events synchronously FIRST
+  // so load-bearing state mutations (e.g. M7's mtls.peer_uri_seen, which
+  // primes the foreign-TD treatment that mtls.handshake.err keys off of)
+  // land on subscribers before the error itself. Then fan out the error
+  // and stop walking. Previously this called preemptAndFlush() which
+  // silently dropped those queued events under non-zero pace, masking the
+  // M7 foreign-URI on the card.
   if (isErr(ev.type)) {
-    preemptAndFlush();
+    if (pendingTimer !== null) {
+      clearTimeout(pendingTimer);
+      pendingTimer = null;
+    }
+    while (queue.length > 0) {
+      fanout(queue.shift());
+    }
     fanout(ev);
     setWalking(false);
     return;
