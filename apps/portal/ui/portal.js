@@ -1,3 +1,5 @@
+import { resetDiagram } from './diagram.js';
+
 const form    = document.getElementById('resolveForm');
 const result  = document.getElementById('result');
 const button  = form.querySelector('button.cta');
@@ -11,11 +13,17 @@ form.addEventListener('submit', async (ev) => {
   button.disabled = true;
   result.innerHTML = '';
 
+  // M7: include the carrier choice from the segmented selector. The handler
+  // defaults to "internal" if the field is absent or the selector is somehow
+  // unchecked, preserving M1-M6 single-carrier behaviour.
+  const carrierChoice =
+    form.querySelector('input[name="carrier"]:checked')?.value || 'internal';
+
   try {
     const resp = await fetch('/resolve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shipment_id: id }),
+      body: JSON.stringify({ shipment_id: id, carrier: carrierChoice }),
     });
     if (resp.status === 404) {
       renderRow(result, 'status', 'shipment not found');
@@ -56,3 +64,12 @@ function renderRow(root, k, v) {
   row.append(kEl, vEl);
   root.append(row);
 }
+
+// M7: reset the diagram + result pane whenever the carrier selector flips.
+// This is the demo's only "reset" affordance per spec section 7.1.
+document.querySelectorAll('input[name="carrier"]').forEach(r => {
+  r.addEventListener('change', () => {
+    resetDiagram();
+    if (result) result.innerHTML = '';
+  });
+});
