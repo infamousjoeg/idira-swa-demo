@@ -18,6 +18,10 @@ var errCarrierDown = errors.New("carrier unreachable")
 
 type resolveReq struct {
 	ShipmentID string `json:"shipment_id"`
+	// Carrier selects which backend the resolve targets. Empty defaults to
+	// "internal" in handleResolve so M1-M6 JS clients (which omit the field)
+	// keep working. "external" routes to the Acme client added in M7.
+	Carrier string `json:"carrier,omitempty"`
 }
 
 func handleResolve(c carrierAPI, bus *TraceBus) http.HandlerFunc {

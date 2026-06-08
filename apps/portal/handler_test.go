@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -68,4 +70,34 @@ func TestResolve_NotPOSTReturns405(t *testing.T) {
 	if w.Code != 405 {
 		t.Errorf("status: %d", w.Code)
 	}
+}
+
+func TestResolveReq_CarrierFieldDefaultsInternal(t *testing.T) {
+	// Empty carrier in the JSON body must NOT default to "" on the wire --
+	// the handler must default to "internal" so existing JS clients (M1-M6)
+	// that don't send a carrier field continue to hit the internal flow.
+	body := strings.NewReader(`{"shipment_id":"SHP-2049-883"}`)
+	req := httptest.NewRequest(http.MethodPost, "/resolve", body)
+	got := decodedResolveReq(t, req.Body)
+	if got.Carrier != "" {
+		t.Errorf("decoded Carrier = %q, want empty (handler defaults later)", got.Carrier)
+	}
+}
+
+func TestResolveReq_CarrierFieldExternal(t *testing.T) {
+	body := strings.NewReader(`{"shipment_id":"SHP-2049-883","carrier":"external"}`)
+	req := httptest.NewRequest(http.MethodPost, "/resolve", body)
+	got := decodedResolveReq(t, req.Body)
+	if got.Carrier != "external" {
+		t.Errorf("decoded Carrier = %q, want external", got.Carrier)
+	}
+}
+
+func decodedResolveReq(t *testing.T, body io.Reader) resolveReq {
+	t.Helper()
+	var r resolveReq
+	if err := json.NewDecoder(body).Decode(&r); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return r
 }
