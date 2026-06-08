@@ -151,6 +151,9 @@ down: _check-env ## Tear down everything (cluster + tenant TF state). Best-effor
 	    echo "==> tf state remaining: $$remaining"; \
 	    if [ "$$remaining" = "0" ]; then break; fi; \
 	  done'
+	-kubectl delete -f platform/k8s/acme.service.yaml    --ignore-not-found
+	-kubectl delete -f platform/k8s/acme.deployment.yaml --ignore-not-found
+	-kubectl delete -f platform/k8s/acme.namespace.yaml  --ignore-not-found --wait=false
 	-kubectl delete ns swa-demo swa-system --wait=false 2>/dev/null
 	-kind delete cluster --name $(KIND_CLUSTER)
 
@@ -167,10 +170,12 @@ tf-apply-app: _check-env tf-init ## Apply TF subset #2: jwt authn + policy + sec
 	@$(TF) output -json | jq -r '"carrier_host_id   = " + .carrier_host_id.value, "carrier_secret_id = " + .carrier_secret_id.value'
 
 build-apps: ## Build the demo app images locally and load into kind
-	docker build -t idira/carrier:m2 apps/carrier/
-	docker build -t idira/portal:m3  apps/portal/
-	kind load docker-image idira/carrier:m2 --name $(KIND_CLUSTER)
-	kind load docker-image idira/portal:m3  --name $(KIND_CLUSTER)
+	docker build -t idira/carrier:m2      apps/carrier/
+	docker build -t idira/portal:m3       apps/portal/
+	docker build -t idira/acme-carrier:m7 apps/acme-carrier/
+	kind load docker-image idira/carrier:m2      --name $(KIND_CLUSTER)
+	kind load docker-image idira/portal:m3       --name $(KIND_CLUSTER)
+	kind load docker-image idira/acme-carrier:m7 --name $(KIND_CLUSTER)
 
 deploy-apps: ## Deploy carrier + portal into swa-demo
 	kubectl apply -f platform/k8s/namespace.yaml
@@ -198,6 +203,10 @@ deploy-apps: ## Deploy carrier + portal into swa-demo
 	kubectl apply -f platform/k8s/portal.service.yaml
 	kubectl -n swa-demo rollout status deploy/carrier --timeout=2m
 	kubectl -n swa-demo rollout status deploy/portal  --timeout=2m
+	kubectl apply -f platform/k8s/acme.namespace.yaml
+	kubectl apply -f platform/k8s/acme.deployment.yaml
+	kubectl apply -f platform/k8s/acme.service.yaml
+	kubectl -n acme-external rollout status deploy/acme-carrier --timeout=2m
 
 smoke-m2: ## Run M2 acceptance check
 	@./scripts/smoke-m2.sh
