@@ -9,12 +9,58 @@
 import { setIssuedAndExp, subscribe as subscribeTTL, formatMSS } from './ttl-ticker.js';
 import { subscribe as subscribeTrace, onStateChange, skip as skipPace } from './pace-queue.js';
 import { flipTo, currentlyFlipped, onFlipChange } from './flip-controller.js';
-import { renderBack } from './card-backs.js';
+import { renderBack, setForeignCertState, clearForeignCertState } from './card-backs.js';
+import { renderRejection } from './evidence.js';
 
 const root = document.getElementById('diagram');
 if (root) renderSkeleton(root);
 
 let identityCache = null;
+
+// resetDiagram clears all per-resolve M7 foreign-TD mutations and restores
+// the bootstrap presentation. Called by portal.js when the carrier selector
+// toggles. Also calls resetForReplay() to wipe any prior stage state so the
+// next resolve walks the SSE timeline from idle. Idempotent.
+export function resetDiagram() {
+  // Remove the TRUST BOUNDARY tile if present.
+  const tile = document.getElementById('tile-boundary');
+  if (tile) tile.remove();
+
+  // Restore the right card's label + foreign-TD treatment.
+  const carrierRect = document.getElementById('carrier-rect');
+  const carrierLbl  = document.getElementById('carrier-rect-label');
+  if (carrierRect) carrierRect.classList.remove('foreign');
+  if (carrierLbl) {
+    carrierLbl.classList.remove('label-foreign');
+    carrierLbl.textContent = 'CARRIER · X.509-SVID';
+  }
+  const san1 = document.getElementById('carrier-san-1');
+  const san2 = document.getElementById('carrier-san-2');
+  if (san1) san1.classList.remove('uri-foreign');
+  if (san2) san2.classList.remove('uri-foreign');
+
+  // Undim any stages skipped by the foreign-rejection path.
+  document.querySelectorAll('.stage-skipped').forEach(el => el.classList.remove('stage-skipped'));
+
+  // Reset the mTLS connector + label (label doubles as the M7 "eyebrow"
+  // because the existing #mtls-label is the only text element above the line).
+  const conn = document.getElementById('mtls-line');
+  if (conn) conn.classList.remove('rejected');
+  const eyebrow = document.getElementById('mtls-label');
+  if (eyebrow) {
+    eyebrow.classList.remove('eyebrow-rejected');
+    eyebrow.textContent = 'mTLS';
+  }
+
+  // Drop the cached foreign cert details so the carrier card-back flips back
+  // to the internal X.509 view.
+  clearForeignCertState();
+
+  // Walk the existing replay-reset so stage cards return to idle and identity
+  // re-paints. paintIdentity restores the internal carrier SAN URI.
+  resetForReplay();
+  if (identityCache) paintIdentity(identityCache);
+}
 
 async function loadIdentity() {
   try {
@@ -94,7 +140,7 @@ function renderSkeleton(host) {
   <!-- Carrier X.509-SVID card -->
   <g id="carrier-rect-host" class="card-host">
     <rect x="320" y="140" width="250" height="130" class="stage-rect" id="carrier-rect"/>
-    <text x="332" y="160" font-size="9" font-weight="700" letter-spacing="2" class="label-idira">CARRIER · X.509-SVID</text>
+    <text x="332" y="160" font-size="9" font-weight="700" letter-spacing="2" class="label-idira" id="carrier-rect-label">CARRIER · X.509-SVID</text>
     <text x="332" y="180" font-size="8" font-weight="700" letter-spacing="1.6" class="label-mute">SAN URI</text>
     <text x="332" y="195" font-family="ui-monospace,Menlo" font-size="10" class="label-idira" id="carrier-san-1">—</text>
     <text x="332" y="208" font-family="ui-monospace,Menlo" font-size="10" class="label-idira" id="carrier-san-2"></text>
@@ -114,7 +160,7 @@ function renderSkeleton(host) {
   <!-- mTLS edge -->
   <g id="mtls-edge">
     <line x1="260" y1="205" x2="320" y2="205" class="conn" id="mtls-line" marker-start="url(#arl)" marker-end="url(#arr)"/>
-    <text x="290" y="192" font-size="9" font-weight="700" letter-spacing="1.6" text-anchor="middle" class="label-mute" id="mtls-label">mTLS</text>
+    <text x="290" y="134" font-size="9" font-weight="700" letter-spacing="1.6" text-anchor="middle" class="label-mute" id="mtls-label">mTLS</text>
     <text x="290" y="224" font-family="ui-monospace,Menlo" font-size="8" text-anchor="middle" class="label-idira" id="mtls-cipher"></text>
   </g>
 
@@ -252,6 +298,13 @@ subscribeTrace(dispatch);
 function dispatch(ev) {
   const handler = DISPATCH[ev.type];
   if (handler) handler(ev);
+  // M7: in foreign-TD mode the dedicated mtls.handshake.err handler below
+  // already paints the rejection in the foreign style. Suppress the generic
+  // error decorator so .conn--err does not override .conn.rejected.
+  if (ev.type === 'mtls.handshake.err' &&
+      document.getElementById('carrier-rect')?.classList.contains('foreign')) {
+    return;
+  }
   if (/\.err$/.test(ev.type)) handleError(ev);
 }
 
@@ -260,6 +313,11 @@ const DISPATCH = {
     resetForReplay();
     setRectState('portal-rect', 'lit');
     setHintHidden(true);
+  },
+  'portal.resolve.rejected': () => {
+    // M7: portal handler emitted a foreign-rejection. Swap the trust evidence
+    // panel to the boundary-teaching copy.
+    renderRejection();
   },
   'mtls.handshake.start': () => {
     setConnState('mtls-line', 'lit');
@@ -271,10 +329,73 @@ const DISPATCH = {
     // unless we surface a pending state up front.
     setRectState('carrier-rect', 'pending');
   },
-  'mtls.handshake.err': () => {
-    // Flip the pending carrier card to err so it doesn't sit half-lit when
-    // the connection actually failed. handleError() will still mark the line.
-    setRectState('carrier-rect', 'err');
+  'mtls.peer_uri_seen': (ev) => {
+    // M7: portal saw the foreign peer's SAN URI extracted from the
+    // CertificateVerificationError. Swap the right card to ACME foreign-TD
+    // treatment and render the URI in orange.
+    const carrierRect = document.getElementById('carrier-rect');
+    const carrierLbl  = document.getElementById('carrier-rect-label');
+    if (carrierRect) {
+      // Clear any pending/lit state so the .foreign dashed stroke is the
+      // dominant visual; .foreign uses --panw-orange dashed per Task 13 CSS.
+      setRectState('carrier-rect', null);
+      carrierRect.classList.add('foreign');
+      // setRectState(null) hid the caret + dropped the host clickable class;
+      // the foreign card IS clickable (Task 16 ACME flip-back), so re-enable.
+      const caret = document.getElementById('carrier-rect-caret');
+      if (caret) caret.setAttribute('visibility', 'visible');
+      carrierRect.closest('g.card-host')?.classList.add('stage-host--clickable');
+    }
+    if (carrierLbl) {
+      carrierLbl.textContent = 'ACME · FOREIGN TD';
+      carrierLbl.classList.add('label-foreign');
+    }
+    const san1 = document.getElementById('carrier-san-1');
+    const san2 = document.getElementById('carrier-san-2');
+    const uri = ev.payload?.uri || '';
+    // Split SPIFFE URI after the trust-domain '/' so it wraps cleanly across
+    // the two SAN-URI text lines on the card.
+    const slash = uri.indexOf('/', 'spiffe://'.length);
+    if (san1) {
+      san1.textContent = slash >= 0 ? uri.slice(0, slash + 1) : uri;
+      san1.classList.add('uri-foreign');
+    }
+    if (san2) {
+      san2.textContent = slash >= 0 ? uri.slice(slash + 1) : '';
+      san2.classList.add('uri-foreign');
+    }
+    // Stash the foreign cert state for the card-back ACME renderer.
+    setForeignCertState({ uri });
+  },
+  'mtls.handshake.err': (ev) => {
+    // M7: if the right card is already painted foreign (peer_uri_seen fired
+    // first), this is a trust-boundary rejection. Mark the connector
+    // rejected, swap the eyebrow text to the rejection legend, dim the
+    // downstream stack, and append the TRUST BOUNDARY tile. Otherwise this
+    // is an internal-flow mTLS failure; fall back to the legacy behaviour
+    // (mark carrier-rect as err so it stops sitting half-lit).
+    const carrierRect = document.getElementById('carrier-rect');
+    const isForeign = carrierRect?.classList.contains('foreign');
+    if (!isForeign) {
+      setRectState('carrier-rect', 'err');
+      return;
+    }
+    const conn = document.getElementById('mtls-line');
+    if (conn) conn.classList.add('rejected');
+    const eyebrow = document.getElementById('mtls-label');
+    if (eyebrow) {
+      const msg = String(ev.payload?.err || '').toLowerCase();
+      eyebrow.textContent = msg.includes('unknown authority')
+        ? 'mTLS REJECTED · UNTRUSTED AUTHORITY'
+        : 'mTLS FAILED';
+      eyebrow.classList.add('eyebrow-rejected');
+    }
+    // Dim the downstream stack -- nothing past mTLS ran.
+    ['jwt-rect-host', 'sm-rect-host', 'secret-rect-host'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('stage-skipped');
+    });
+    appendTrustBoundaryTile();
   },
   'mtls.handshake.ok': (ev) => {
     setRectState('carrier-rect', 'lit');
@@ -422,6 +543,24 @@ function currentSecretID() {
   return identityCache?.secret_id || 'swa-demo/carrier/api-key';
 }
 
+// appendTrustBoundaryTile renders the M7 educational tile beneath the
+// existing stack when the foreign rejection completes. Idempotent: bails if
+// the tile is already present. Removed by resetDiagram() on carrier toggle.
+function appendTrustBoundaryTile() {
+  if (document.getElementById('tile-boundary')) return;
+  const svg = document.querySelector('#diagram svg');
+  if (!svg) return;
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.id = 'tile-boundary';
+  g.innerHTML = `
+    <rect x="10" y="620" width="560" height="80" class="tile-boundary"/>
+    <text x="22" y="640" class="tile-boundary-label">TRUST BOUNDARY</text>
+    <text x="22" y="660" class="tile-boundary-body">acme.courier is outside idira.demo. No shared trust roots.</text>
+    <text x="22" y="676" class="tile-boundary-body">SWA trust-domain federation would resolve this; not yet available.</text>
+  `;
+  svg.appendChild(g);
+}
+
 // === TTL countdown wiring ===
 // Single subscription drives the JWT hero TTL text + bar in the right pane.
 // The left-pane evidence card subscribes separately (evidence.js).
@@ -483,7 +622,8 @@ for (const cid of CARD_IDS) {
     const cls = rect.classList;
     if (!cls.contains('stage-rect--lit') &&
         !cls.contains('stage-rect--hero') &&
-        !cls.contains('stage-rect--err')) return;
+        !cls.contains('stage-rect--err') &&
+        !cls.contains('foreign')) return;
     flipTo(currentlyFlipped() === cid ? null : cid);
   });
 }

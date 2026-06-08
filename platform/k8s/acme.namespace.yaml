@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: acme-external
+  labels:
+    # M7: this namespace deliberately runs WITHOUT a SWA agent. The
+    # workloads here mint their own keys in-process and present a cert
+    # the portal's SWA trust bundle does NOT validate. The whole point
+    # is to demonstrate that the portal genuinely rejects them.
+    purpose: demo-foreign-trust-domain

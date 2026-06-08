@@ -151,6 +151,9 @@ down: _check-env ## Tear down everything (cluster + tenant TF state). Best-effor
 	    echo "==> tf state remaining: $$remaining"; \
 	    if [ "$$remaining" = "0" ]; then break; fi; \
 	  done'
+	-kubectl delete -f platform/k8s/acme.service.yaml    --ignore-not-found
+	-kubectl delete -f platform/k8s/acme.deployment.yaml --ignore-not-found
+	-kubectl delete -f platform/k8s/acme.namespace.yaml  --ignore-not-found --wait=false
 	-kubectl delete ns swa-demo swa-system --wait=false 2>/dev/null
 	-kind delete cluster --name $(KIND_CLUSTER)
 
@@ -167,10 +170,12 @@ tf-apply-app: _check-env tf-init ## Apply TF subset #2: jwt authn + policy + sec
 	@$(TF) output -json | jq -r '"carrier_host_id   = " + .carrier_host_id.value, "carrier_secret_id = " + .carrier_secret_id.value'
 
 build-apps: ## Build the demo app images locally and load into kind
-	docker build -t idira/carrier:m2 apps/carrier/
-	docker build -t idira/portal:m3  apps/portal/
-	kind load docker-image idira/carrier:m2 --name $(KIND_CLUSTER)
-	kind load docker-image idira/portal:m3  --name $(KIND_CLUSTER)
+	docker build -t idira/carrier:m2      apps/carrier/
+	docker build -t idira/portal:m3       apps/portal/
+	docker build -t idira/acme-carrier:m7 apps/acme-carrier/
+	kind load docker-image idira/carrier:m2      --name $(KIND_CLUSTER)
+	kind load docker-image idira/portal:m3       --name $(KIND_CLUSTER)
+	kind load docker-image idira/acme-carrier:m7 --name $(KIND_CLUSTER)
 
 deploy-apps: ## Deploy carrier + portal into swa-demo
 	kubectl apply -f platform/k8s/namespace.yaml
@@ -198,6 +203,10 @@ deploy-apps: ## Deploy carrier + portal into swa-demo
 	kubectl apply -f platform/k8s/portal.service.yaml
 	kubectl -n swa-demo rollout status deploy/carrier --timeout=2m
 	kubectl -n swa-demo rollout status deploy/portal  --timeout=2m
+	kubectl apply -f platform/k8s/acme.namespace.yaml
+	kubectl apply -f platform/k8s/acme.deployment.yaml
+	kubectl apply -f platform/k8s/acme.service.yaml
+	kubectl -n acme-external rollout status deploy/acme-carrier --timeout=2m
 
 smoke-m2: ## Run M2 acceptance check
 	@./scripts/smoke-m2.sh
@@ -205,7 +214,7 @@ smoke-m2: ## Run M2 acceptance check
 up-m2: up-m1 build-apps deploy-apps tf-apply-app smoke-m2 ## Full M2 deploy + smoketest
 	@echo 'M2 ready.'
 
-.PHONY: portforward smoke-m3 up smoke readme-shots
+.PHONY: portforward smoke-m3 smoke-m7 up smoke readme-shots
 
 PORT ?= 8080
 portforward: ## Forward portal to localhost:$(PORT) (override with PORT=, blocks)
@@ -224,15 +233,17 @@ readme-shots: ## Capture docs/img/*.png from a live portal (uses :18080)
 smoke-m3: ## Run M3 acceptance check (headless browser)
 	@./scripts/smoke-ui.sh
 
+smoke-m7: ## Run M7 acceptance check (foreign-TD rejection + internal regression)
+	@./scripts/smoke-m7.sh
+
 # up -- full demo from clean slate. The dependency chain runs each step
-# in order (M1 platform → app images → app deploy → app TF → M3 smoke).
-# Uses smoke-m3 at the end because the M3 headless smoke exercises the
-# full M1+M2+M3 stack -- running smoke-m1/m2 separately would just be
-# redundant during a clean `make up`.
-up: up-m1 build-apps deploy-apps tf-apply-app smoke-m3 ## Full demo deploy + smoketest
+# in order (M1 platform → app images → app deploy → app TF → M3 smoke → M7 smoke).
+# Uses smoke-m3 + smoke-m7 at the end: m3 exercises the full M1+M2+M3 internal
+# stack, m7 exercises the foreign-TD rejection plus an internal regression check.
+up: up-m1 build-apps deploy-apps tf-apply-app smoke-m3 smoke-m7 ## Full demo deploy + smoketest
 	@echo
 	@echo 'Demo ready. Run: make portforward'
 
-# smoke -- runs all three milestone smoketests in order. Use this to spot
+# smoke -- runs all four milestone smoketests in order. Use this to spot
 # which milestone broke if `make up` ever surprises you.
-smoke: smoke-m1 smoke-m2 smoke-m3 ## Run all milestone smoketests
+smoke: smoke-m1 smoke-m2 smoke-m3 smoke-m7 ## Run all milestone smoketests

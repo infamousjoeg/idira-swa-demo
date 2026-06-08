@@ -21,6 +21,15 @@
       <label for="shipmentId" class="resolve__label">Shipment ID</label>
       <input id="shipmentId" name="shipment_id" type="text" autocomplete="off"
         value="SHP-2049-883" required pattern="SHP-[A-Za-z0-9-]+">
+
+      <span class="resolve__label">Carrier</span>
+      <div class="seg" role="radiogroup" aria-label="Carrier">
+        <input type="radio" name="carrier" id="carrierInternal" value="internal" checked>
+        <label for="carrierInternal" class="seg__opt">INTERNAL</label>
+        <input type="radio" name="carrier" id="carrierExternal" value="external">
+        <label for="carrierExternal" class="seg__opt">EXTERNAL</label>
+      </div>
+
       <button type="submit" class="cta">RESOLVE SECRET</button>
     </form>
 

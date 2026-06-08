@@ -53,3 +53,29 @@ function escapeHTML(s) {
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]));
 }
+
+// renderRejection rewrites the trust evidence panel for the External-mode
+// rejection. Called by the diagram subscriber when portal.resolve.rejected
+// fires (carrier=external, reason=trust_boundary). Copy is verbatim from the
+// spec/plan and graded for exactness.
+export function renderRejection() {
+  const ev = document.getElementById('evidence');
+  if (!ev) return;
+  ev.hidden = false;
+  ev.classList.remove('evidence--dim');
+  const set = (slot, html) => {
+    const el = ev.querySelector(`[data-slot="${slot}"]`);
+    if (el) el.innerHTML = html;
+  };
+  set('line1',
+    'This carrier presented a certificate signed by <strong>a CA your trust domain does not know</strong>. ' +
+    'No federation is configured; SWA does not yet support cross-trust-domain federation.');
+  set('line2',
+    'No JWT-SVID was issued, no Secrets Manager call was made, no secret was fetched. ' +
+    'The mTLS handshake was rejected before any application data crossed the wire.');
+  set('line3',
+    'This is the boundary SPIFFE was designed to enforce. The foreign workload still has its own ' +
+    'identity (look at the cert on the right); your trust roots simply do not anchor it.');
+  const sub = ev.querySelector('.evidence__sub');
+  if (sub) sub.textContent = 'See the live trust diagram on the right →';
+}

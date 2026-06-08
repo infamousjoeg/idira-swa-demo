@@ -317,6 +317,58 @@ If `api.sock` exists and is owned by `65532:65532`, the agent is healthy. The ac
 
 ---
 
+## Beat 2 -- what happens at a trust boundary
+
+The first beat showed a successful identity exchange between two workloads in
+the same trust domain. The second beat is the other half of the story: what
+happens when the workload you are calling lives in a *different* trust domain.
+
+**Pre-condition:** `acme-carrier` is already running from `make up`. Verify with:
+
+```bash
+kubectl get pods -n acme-external
+```
+
+You should see one `acme-carrier-...` pod in `Running` state. It is deliberately
+NOT a SWA workload -- no swa-agent involvement, no SVID, no shared trust roots
+with `idira.demo`. It mints its own self-signed CA and leaf cert in-process at
+startup, with one SPIFFE-shaped SAN URI: `spiffe://acme.courier/carrier/parcel`.
+
+**The UI action.** In the carrier selector above RESOLVE SECRET, click
+**EXTERNAL**. Then click **RESOLVE SECRET**.
+
+**What the inspector shows.** Reading top to bottom:
+
+1. `portal.resolve.requested` with `carrier: external` -- portal received the request.
+2. `mtls.handshake.start` -- the dial against `acme-carrier.acme-external.svc.cluster.local:8443`.
+3. `mtls.peer_uri_seen` with `uri: spiffe://acme.courier/carrier/parcel` -- the portal extracted Acme's identity from the `*tls.CertificateVerificationError.UnverifiedCertificates` returned by Go's standard verifier. **The portal saw the cert** before rejecting it.
+4. `mtls.handshake.err` with `err: "...x509: certificate signed by unknown authority"` -- the standard verifier failed because Acme's CA is not in the portal's SWA trust bundle. The handshake terminated; no application data crossed the wire.
+
+The inspector right-card has swapped from `CARRIER · X.509-SVID` (blue) to
+`ACME · FOREIGN TD` (orange, dashed). The mTLS connector shows
+`mTLS REJECTED · UNTRUSTED AUTHORITY`. The JWT-SVID / Secrets Manager / Secret
+stages below are dimmed and marked `SKIPPED` -- they genuinely never executed.
+
+A `TRUST BOUNDARY` tile appears at the bottom of the inspector with copy
+explaining the rejection in SPIFFE terms.
+
+**Inspect the rejected cert.** Click the ACME card to flip it. The back shows
+the foreign cert's fields: empty Subject (SPIFFE identity lives in the SAN URI),
+Issuer `CN=acme.courier root` (Acme's own self-signed CA), the SAN URI, and
+the signature algorithm. This is the actual certificate the portal rejected --
+not a hardcoded label, not a simulation.
+
+**The takeaway.** Trust-domain boundaries are real and SWA enforces them today.
+Cross-trust-domain federation (where two trust domains can agree to verify
+each other's identities) is on the SWA roadmap. Until federation ships, there
+is no UI toggle, no manual override, and no demo trick that will make this
+handshake succeed -- the rejection is the lesson.
+
+**Toggle back.** Click **INTERNAL** in the selector. The diagram resets to
+its bootstrap state; the Beat 1 flow is ready to run again.
+
+---
+
 ## 5. Observability and troubleshooting
 
 | Symptom | First place to look |

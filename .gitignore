@@ -5,6 +5,9 @@ swa-release-1.0.4/
 # Local environment
 .envrc
 
+# Superpowers brainstorming session artifacts (visual companion mockups, state)
+.superpowers/
+
 # Terraform local state and lock files
 platform/terraform/.terraform/
 platform/terraform/.terraform.lock.hcl
@@ -20,6 +23,7 @@ platform/helm/*.values.yaml
 # Built binaries (produced by `make build-*`)
 apps/carrier/carrier
 apps/portal/portal
+apps/acme-carrier/acme-carrier
 
 # UI test artifacts
 ui-tests/node_modules/

@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"embed"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -52,6 +55,10 @@ func run() error {
 		// The host's hostPath /tmp/swa-agent/public is mounted at /run/swa-agent.
 		socketPath = "unix:///run/swa-agent/api.sock"
 	}
+	acmeHost := os.Getenv("ACME_HOST")
+	if acmeHost == "" {
+		acmeHost = "acme-carrier.acme-external.svc.cluster.local:8443"
+	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(),
 		syscall.SIGINT, syscall.SIGTERM)
@@ -78,13 +85,40 @@ func run() error {
 		SecretID:    secretID,
 	})
 
+	// External path reuses the SWA trust bundle for its RootCAs.
+	// Acme's cert is NOT in that bundle, so the verifier WILL reject.
+	// Reusing the bundle is the whole point -- no special trust for the External path.
+	bundleSet, err := src.GetX509BundleForTrustDomain(peer.TrustDomain())
+	if err != nil {
+		return fmt.Errorf("portal: cannot read SWA trust bundle: %w", err)
+	}
+	rootCAs := x509.NewCertPool()
+	for _, c := range bundleSet.X509Authorities() {
+		rootCAs.AddCert(c)
+	}
+	portalSVID, err := src.GetX509SVID()
+	if err != nil {
+		return fmt.Errorf("portal: cannot read X509 SVID for external client: %w", err)
+	}
+	// Build a tls.Certificate from the in-memory SPIFFE SVID. The leaf is at
+	// index 0; any intermediates follow. PrivateKey rides along.
+	clientCertChain := make([][]byte, 0, len(portalSVID.Certificates))
+	for _, c := range portalSVID.Certificates {
+		clientCertChain = append(clientCertChain, c.Raw)
+	}
+	clientCert := tls.Certificate{
+		Certificate: clientCertChain,
+		PrivateKey:  portalSVID.PrivateKey,
+	}
+	external := NewExternalCarrierClient(acmeHost, clientCert, rootCAs, bus)
+
 	ui, err := fs.Sub(uiFS, "ui")
 	if err != nil {
 		return err
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.FS(ui)))
-	mux.HandleFunc("/resolve", handleResolve(carrier, bus))
+	mux.HandleFunc("/resolve", handleResolve(carrier, external, bus))
 	mux.HandleFunc("/identity", agg.handler())
 	mux.HandleFunc("/trace", handleTraceSSE(bus))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -109,9 +143,10 @@ func run() error {
 		"server_group":   serverGroup,
 		"attestor":       attestor,
 		"secret_id":      secretID,
+		"acme_host":      acmeHost,
 	}})
-	log.Printf("portal: listening on %s, carrier=%s, spiffe=%s, server_group=%s, attestor=%s",
-		srv.Addr, carrierHost, carrierSPIFFE, serverGroup, attestor)
+	log.Printf("portal: listening on %s, carrier=%s, spiffe=%s, server_group=%s, attestor=%s, acme=%s",
+		srv.Addr, carrierHost, carrierSPIFFE, serverGroup, attestor, acmeHost)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}

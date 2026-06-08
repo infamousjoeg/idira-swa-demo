@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: acme-carrier
+  namespace: acme-external
+  labels: {app: acme-carrier}
+spec:
+  type: ClusterIP
+  selector: {app: acme-carrier}
+  ports:
+    - name: mtls
+      port: 8443
+      targetPort: mtls
+    - name: health
+      port: 8444
+      targetPort: health
