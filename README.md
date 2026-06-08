@@ -1,103 +1,100 @@
 # Idira SWA Demo
 
-A Mac-laptop demo of **Palo Alto Networks' Idira Secure Workload Access (SWA)**: a real workload fetches a real secret from CyberArk Secrets Manager - SaaS without ever holding a static credential. The UI splits left/right so you can *watch* the identity exchange happen on every click.
+![License](https://img.shields.io/github/license/infamousjoeg/idira-swa-demo)
+![Demo only](https://img.shields.io/badge/status-demo--only-orange)
 
-![Portal split view. Left pane shows the Praetor Logistics shipment lookup form with a plain-English trust evidence card; right pane shows the live SPIFFE trust diagram fully walked, with carets visible in the top-right of every lit card marking them as click-to-flip detail targets](docs/img/portal-resolved.png)
+> A Mac laptop demo of Idira Secure Workload Access: real workloads fetch real secrets via SPIFFE identity, with zero static credentials.
 
----
+![Portal split view with the resolved trust diagram fully walked](docs/img/portal-resolved.png)
 
-## New to workload identity? Start here.
+## Table of contents
 
-If terms like **SPIFFE**, **SVID**, **mTLS**, or **JWT authn** aren't second-nature yet, you'll get a lot more out of this demo after a quick visual tour:
+- [What this is](#what-this-is)
+- [Quick start](#quick-start)
+- [Prerequisites](#prerequisites)
+- [What you will see when it runs](#what-you-will-see-when-it-runs)
+- [Architecture](#architecture)
+- [Build incrementally](#build-incrementally)
+- [Repository layout](#repository-layout)
+- [Security](#security)
+- [Contributing](#contributing)
+- [Maintainers](#maintainers)
+- [License](#license)
 
-> **→ [thesecretlivesofidentity.com](https://thesecretlivesofidentity.com).** Interactive visualizations that demystify workload identity. Start with the SPIFFE explainer; it covers exactly the concepts this demo puts into motion.
+## What this is
 
-The 60-second version, just to keep reading:
+A self-contained sandbox that runs the full Idira Secure Workload Access (SWA) stack on a single kind cluster on your Mac. Two Go demo apps (`carrier` and `portal`) authenticate to a real Idira Secrets Manager - SaaS tenant using short-lived SPIFFE-issued credentials and fetch a real secret. No API key is ever baked into an image, mounted from a file, or typed into a config. Time from `make up` to a running portal is about four minutes on a clean clone.
 
-- **The problem.** Workloads (services, jobs, agents) need secrets like API keys, DB passwords, OAuth tokens. The traditional fix is to bake those secrets into environment variables, config files, or container images. That's a leak waiting to happen, and rotating the secret means redeploying everything that has a copy.
-- **The SPIFFE answer.** Give every workload a short-lived **cryptographic identity** instead. It's issued by a local agent on the node, scoped to that workload only, with no shared secret. The identity itself becomes proof of who the workload is. A secrets manager can then say "ok, *this* identity is allowed to read *this* secret" and hand it over on demand.
-- **Two flavors of identity.** SPIFFE issues two kinds of credentials, called **SVIDs** (SPIFFE Verifiable IDs):
-  - **X.509-SVID** is a short-lived TLS certificate. Used for **mTLS** (mutual TLS) between services: both sides present a SVID and verify the other's SPIFFE ID before any application data flows.
-  - **JWT-SVID** is a short-lived signed JWT. Used to authenticate to systems that speak HTTP/REST (like Secrets Manager), where you can't do TLS mutual auth but you *can* present a signed token.
-- **Where Idira fits.** Idira SWA is Palo Alto Networks' commercial SPIFFE implementation: a control plane on the CyberArk Secrets Manager - SaaS tenant, plus an in-cluster server + agent that issue SVIDs to your workloads. This demo runs the whole stack end-to-end on a single kind cluster.
+The point is to make the identity exchange visible. The portal UI splits left and right so you can watch each SVID get issued, each mTLS handshake complete, and each Secrets Manager REST call land, in real time, on every click. Click any lit card in the trust diagram to flip it open and see decoded claims, full certificate metadata, or the raw bearer-token exchange.
 
-That's all you need. If you want to go deeper into what attestation actually is, how trust domains work, or why JWT-SVID audience claims matter, the visualizations at [thesecretlivesofidentity.com](https://thesecretlivesofidentity.com) are the fastest way in.
-
----
-
-## What the demo actually does
-
-Open `http://localhost:8080` after `make up && make portforward`:
-
-![Portal idle state, split view ready for a shipment ID with the hierarchy ribbon populated and an idle diagram; no stage cards are lit yet so no flip carets are visible](docs/img/portal-empty.png)
-
-- **Left pane.** *Praetor Logistics* shipment-lookup portal. A plausible-looking internal app that looks up a shipment by ID. Type a shipment ID (e.g. `SHP-2049-883`), click **RESOLVE SECRET**.
-- **Right pane.** *Live SPIFFE trust diagram.* A schematic that paints itself in real time as a resolve flows through. Top is the trust hierarchy (trust domain, server group with attestor, node group), middle is the portal-carrier mTLS edge with each side's full X.509-SVID, bottom is the JWT-SVID hero panel followed by the Secrets Manager SaaS exchange and the secret return. Each stage of the diagram corresponds to a real event in the wire trace.
-
-  Click any lit card in the diagram to flip it and see the underlying detail: decoded JWT claims with the JOSE header and raw compact serialization for the JWT-SVID hero; full X.509 metadata (SAN URI, subject, issuer, serial, fingerprint, signature algorithm) for the two SVID cards; the actual SM POST URL and the bearer-token response (redacted at the Go wire layer, never displayed in full) for the Secrets Manager card; and the secret-fetch metadata (URL, byte count, version, scope; never the secret value) for the secret returned card. Clicking another card auto-flips the previous one back; clicking RESOLVE auto-unflips everything for the next walk. Backs scroll when the content runs longer than the card; the scrollbar is a slim brand-blue rail that stays invisible at rest and fades in on hover (the Whisper Rail), so a clipped JWT payload or full SM response never disappears below the fold without indication.
-
-  ![Portal in resolved state with the JWT-SVID card flipped open, showing the decoded payload, JOSE header, and raw compact JWT; the back scrolls inside the card rect rather than clipping when content exceeds 180px](docs/img/portal-flipped-jwt.png)
-
-  ![SM Secrets Manager card flipped open and scrolled to the bottom; the bearer-token response (eyJh...REDACTED), TTL, and scope rows are now visible, and the slim brand-blue Whisper Rail thumb sits at the bottom of the rail on hover](docs/img/portal-flipped-sm-scrolled.png)
-
-The backend resolve completes in well under 200 ms. By default the diagram paces itself over about 2.25 seconds so a human can see each stage light up in sequence; the pace toggle in the inspector header (off / fast / medium / slow) lets a presenter speed it up or slow it down mid-demo, and `?pace=off` in the URL gives engineers the raw real-time behavior. Nothing is mocked except the carrier's downstream "did you find the shipment" call, which returns canned JSON from a fixture file.
-
-![Portal mid-walk: SKIP button visible, mTLS edge solid, carrier card lit, JWT hero panel about to reveal; faint carets in the top-right of lit cards mark them as flip-to-detail targets](docs/img/portal-walking.png)
-
-### The flow, step by step
-
-1. **Browser → portal.** Plain HTTP, localhost.
-2. **Portal → carrier (mTLS).** Both services already have X.509-SVIDs from the local SWA agent. They open a mutually-authenticated TLS connection where each side verifies the other's exact SPIFFE ID (e.g. `spiffe://idira.demo/kind-ng/ns/swa-demo/sa/carrier`).
-3. **Carrier → agent (Workload API).** Carrier asks the local SWA agent (over a unix socket) for a fresh JWT-SVID with audience `conjur`.
-4. **Carrier → Secrets Manager (HTTPS POST).** Carrier sends the JWT-SVID to SM's `authn-jwt` endpoint. SM verifies the signature against SWA's per-trust-domain JWKS and returns a short-lived access token.
-5. **Carrier → Secrets Manager (HTTPS GET).** Carrier uses that access token to fetch one specific variable (`swa-demo/carrier/api-key`).
-6. **Carrier → fixture.** Uses the secret as a (mocked) carrier API key and looks up the shipment.
-7. **Portal → browser.** Renders the shipment JSON.
-
-What's *not* present anywhere: a hardcoded `API_KEY=…` env var, a mounted secret file, a long-lived bearer token, or any credential the operator typed in.
-
----
-
-## Prerequisites
-
-- macOS Apple Silicon (the bundled SWA container images are `arm64v8`-only for this demo).
-- On PATH: `docker`, `kind`, `kubectl`, `helm`, `terraform`, `jq`, `curl`, `envsubst`, `summon`, `conceal`.
-- A way to load `.envrc` into your shell. [`direnv`](https://direnv.net/) is recommended (`brew install direnv` plus `eval "$(direnv hook zsh)"` in your shell rc, then `direnv allow` in this directory). Without it you must `source .envrc` manually in every new shell before running `make` -- `make doctor` will fail loudly if the env isn't loaded.
-- `node` ≥ 18 (for the headless Playwright smoke test).
-- A `swa-release-1.0.4/` bundle in this directory (gitignored vendor drop from CyberArk, not in this repo).
-- A CyberArk Secrets Manager - SaaS tenant with a Service User you can authenticate as. Copy `.envrc.example` to `.envrc` and set `PANW_SM_TENANT` (your SM SaaS subdomain) and `CONCEAL_NAMESPACE` (the Keychain path where you've stored the Service User credentials).
-
-**No secrets in `.envrc`.** Service User credentials live in the macOS Keychain via [Conceal](https://github.com/infamousjoeg/conceal), under `${CONCEAL_NAMESPACE}/client_id` and `${CONCEAL_NAMESPACE}/client_secret`. Every tenant-touching command is wrapped in [`summon -p conceal_summon`](https://cyberark.github.io/summon), which injects them as env vars for that subprocess only. They're never on disk in cleartext and never visible to `ps`.
-
-`make doctor` enforces all the above (tools, host, env vars, Conceal-stored credentials, tenant reachability) and exits non-zero with a concrete diagnostic if anything's missing.
-
----
+New to SPIFFE or workload identity? Start with [Concepts](https://github.com/infamousjoeg/idira-swa-demo/wiki/Concepts) on the Wiki, or work through the interactive visualizations at [thesecretlivesofidentity.com](https://thesecretlivesofidentity.com).
 
 ## Quick start
 
+**First time on this laptop?** Run `make setup` once. It walks you through installing missing tools, building `.envrc`, and storing your Idira Service User credentials in the macOS Keychain. See [First-time setup](https://github.com/infamousjoeg/idira-swa-demo/wiki/First-time-setup) for the full walkthrough.
+
 ```bash
-cp .envrc.example .envrc
-$EDITOR .envrc                                    # set PANW_SM_TENANT + CONCEAL_NAMESPACE
-direnv allow                                       # or `source .envrc` -- $CONCEAL_NAMESPACE must be exported before the next two commands
-
-# Store your Service User creds in the macOS Keychain (one-time):
-conceal set "$CONCEAL_NAMESPACE/client_id"     <your-service-user-login>
-conceal set "$CONCEAL_NAMESPACE/client_secret" <your-service-user-api-key>
-
-make doctor                                        # verify prerequisites
-make up                                            # full deploy + headless smoke (~4 min)
-make portforward                                   # serve portal on http://localhost:8080
-# ... click around, watch the diagram walk, demo away ...
-make down                                          # tear everything down (cluster + tenant state)
+make setup                          # one-time guided onboarding
+make doctor                         # verify prerequisites
+make up                             # full deploy + smoke (~4 min)
+make portforward PORT=18080         # serve the portal on http://localhost:18080
+make down                           # tear everything back down
 ```
 
-The first `make up` takes ~4 minutes because it has to load the bundled SWA container images into the kind cluster, run `terraform apply` against your tenant, install two Helm charts, and build the two demo Go services. Subsequent cycles after `make down` take closer to 2 minutes.
+Open `http://localhost:18080` once `make portforward PORT=18080` is running, then click **RESOLVE SECRET** to watch the trust diagram walk.
 
----
+The first `make up` takes about four minutes: it loads SWA container images into the kind cluster, applies Terraform against your tenant, installs the two Helm charts, and builds the demo Go services. Subsequent cycles after `make down` finish in about two minutes.
 
-## Build it incrementally
+When you are done, `make down` tears the cluster and the tenant Terraform state down together.
 
-The whole demo lands in three milestones. You can run any of them in isolation:
+![Portal mid-walk, lit cards visible](docs/img/portal-walking.png)
+
+## Prerequisites
+
+- macOS on Apple Silicon. The bundled SWA container images are `arm64v8`-only.
+- Docker (or OrbStack), `kind`, `kubectl`, `helm`, `terraform`, `jq`, `summon`, `conceal`, `direnv`, and Node 18+ on PATH.
+- Homebrew. `make setup` uses it to install anything missing above, with your consent at each step.
+- A `swa-release-1.0.4/` vendor bundle from Idira in the repo root (gitignored; obtain separately).
+- An Idira Secrets Manager - SaaS tenant and a Service User you can authenticate as.
+- An `.envrc` with `PANW_SM_TENANT` and `CONCEAL_NAMESPACE` set (created by `make setup`).
+
+Hand-installing instead of running `make setup`? See [Manual prereqs](https://github.com/infamousjoeg/idira-swa-demo/wiki/Manual-prereqs).
+
+## What you will see when it runs
+
+The left pane is a plausible internal shipment-lookup portal: type a shipment ID, click **RESOLVE SECRET**, get a shipment record. The right pane is a live SPIFFE trust diagram that paints itself in real time as the resolve flows through, with cards for the trust hierarchy, the portal-to-carrier mTLS edge, the JWT-SVID hero panel, and the Secrets Manager exchange.
+
+Every lit card is clickable: flip it open to see decoded JWT claims, full X.509 metadata, or the raw bearer-token exchange. A click resolves in well under 200 ms; the diagram paces itself over about 2.25 seconds by default so a human can follow each stage. The pace toggle in the inspector header and `?pace=off` in the URL give you faster or fully real-time behavior on demand.
+
+Full screenshot walkthrough and wire-trace breakdown: [Portal tour](https://github.com/infamousjoeg/idira-swa-demo/wiki/Portal-tour) and [Wire trace](https://github.com/infamousjoeg/idira-swa-demo/wiki/Wire-trace).
+
+## Architecture
+
+Three layers cooperate to issue and validate identity. An Idira Secrets Manager - SaaS tenant is the control plane: it holds the SPIFFE trust hierarchy, signs SVIDs, and stores the demo secret. An in-cluster SWA Server authenticates to the control plane and serves agents over gRPC. A SWA Agent DaemonSet runs on every node, mints SVIDs for local workloads, and exposes them through a unix-socket Workload API. The demo apps (`carrier` and `portal`) consume those SVIDs to do mTLS and to mint JWT-SVIDs for the Secrets Manager call. The [Architecture deep-dive](https://github.com/infamousjoeg/idira-swa-demo/wiki/Architecture) on the Wiki covers the SPIFFE hierarchy, node attestation modes (`k8s_psat` and `x509pop`), and the control-plane API in full.
+
+```
++-------------------------------+
+| Secrets Manager SaaS (tenant) |   control plane
++---------------+---------------+
+                | (JWT auth, REST)
++---------------v---------------+
+|   SWA Server (Deployment)     |   in-cluster
++---------------+---------------+
+                | (gRPC :8443)
++---------------v---------------+
+|   SWA Agent (DaemonSet)       |   per node, Workload API socket
++---------------+---------------+
+                | (unix socket)
++---------------v---------------+
+|   portal  <--mTLS-->  carrier |   demo apps in apps/
++-------------------------------+
+```
+
+## Build incrementally
+
+`make up` is the full path, but you do not have to take it. The deploy lands in three milestones and each one has its own acceptance smoke. Run any of them in isolation when you want to study one layer, debug a single stage, or iterate on the apps without paying the full cluster bring-up cost each time.
+
+You can run any milestone in isolation:
 
 | Target | What it does | Time |
 |---|---|---|
@@ -114,45 +111,41 @@ Each milestone has an acceptance check:
 | `make smoke-m3` | full click sequence emits all 6 expected trace event types within 3 s, brand asserts pass |
 | `make smoke`    | all three, in order |
 
----
+Run `make help` for the full target list with one-line descriptions, or see the [Reference](https://github.com/infamousjoeg/idira-swa-demo/wiki/Reference) page for the table form with dependencies and side effects.
 
-## How tokens behave
+## Repository layout
 
-Identity OAuth tokens are ≤15 min; SM access tokens are ~8 min. Every Make target that touches the tenant re-mints a fresh operator token via `scripts/get-sm-token.sh` (which itself is wrapped in `summon -p conceal_summon`). For ad-hoc `terraform` runs, `eval "$(make tf-token)"` exports a fresh set into your current shell.
+```
+apps/                  Go services (carrier, portal) consumed by the demo
+docs/                  images and reference companions for the README
+platform/              Helm values, Kubernetes manifests, Terraform sources
+scripts/               setup, doctor, deploy, and tenant-token helpers
+swa-docs/              mirrored upstream Idira SWA docs (read-only)
+swa-release-1.0.4/     vendor bundle from Idira (gitignored; obtain separately)
+ui-tests/              Playwright headless smoke test driving the portal
+out/                   generated artifacts from make targets (gitignored)
+```
 
-`make down` is hardened against the "token expired mid-destroy" failure mode: it retries the `terraform destroy` up to 3 times with a fresh token per attempt, stopping as soon as `terraform state list` is empty.
+## Security
 
----
+This is a demo, not a production deployment. Do not point it at a tenant that holds real secrets.
 
-## Architecture at a glance
+No secret material is committed to this repo. Service User credentials live in the macOS Keychain via [Conceal](https://github.com/infamousjoeg/conceal); every tenant-touching command is wrapped in `summon -p conceal_summon` and injected as env vars for that subprocess only. The SM operator token is re-minted per Make target invocation rather than cached, with a TTL under 15 minutes.
 
-Three layers:
+In-cluster mTLS uses explicit SPIFFE-ID authorization (no wildcard authorizers), and the Conjur policy scopes the carrier to read exactly one variable. The only cluster-wide RBAC permission granted is `TokenReview`, required by the `k8s_psat` node attestor.
 
-1. **Control plane: CyberArk Secrets Manager - SaaS.** Holds the SPIFFE hierarchy (trust domain → server group → node group → server), signs SVIDs, holds the secret. Managed declaratively via two Terraform providers: [`cyberark/swa`](https://registry.terraform.io/providers/cyberark/swa/latest) (bundled, SPIFFE platform layer) and [`cyberark/conjur`](https://registry.terraform.io/providers/cyberark/conjur/latest) (public registry, Conjur policy / authenticator / secret).
-2. **SWA Server (in-cluster Deployment).** Authenticates to the control plane via projected SA token. Listens on `:8443` (gRPC for agents) and `:8080` (web). Holds the cluster's PSAT trust anchor.
-3. **SWA Agent (in-cluster DaemonSet).** Per-node. Mints SVIDs for workloads. Exposes a SPIFFE Workload API socket at `/tmp/swa-agent/public/api.sock` via `hostPath` so co-located workload pods can fetch SVIDs without RPCs leaving the node.
+Full policy and vulnerability reporting process: [SECURITY.md](SECURITY.md).
 
-Demo apps in `apps/`:
+## Contributing
 
-- **`carrier`** (Go). The workload that actually consumes a secret. Single binary, distroless image, ~150 lines of business logic. Uses [`go-spiffe/v2`](https://github.com/spiffe/go-spiffe) for SVID handling.
-- **`portal`** (Go + vanilla HTML/CSS/JS). The browser-facing surface. Opens mTLS to carrier, multiplexes its own trace events with the carrier's trace SSE into one stream that drives the live trust diagram. Serves `GET /identity` so the diagram can render the SPIFFE hierarchy and both workload SVIDs. Vanilla front end on purpose: no React, no Tailwind, no shadcn.
+Bug reports, doc improvements, and additional smoke targets are welcome. This is a demo, not a product, so big architectural changes are unlikely to merge; open an issue describing the change before sending a PR for anything larger than a typo fix.
 
----
+Run the pre-PR checks (`make doctor`, `shellcheck scripts/*.sh`, and the relevant smoke target) locally first. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full checklist and the documentation conventions this repo enforces.
 
-## Found a bug? Want to learn the concepts?
+## Maintainers
 
-- **Bug or feature request for this demo:** open an issue on this repo.
-- **Want to understand SPIFFE, SVIDs, attestation, trust domains, or workload identity in general?** **[thesecretlivesofidentity.com](https://thesecretlivesofidentity.com)** is the best starting point. Interactive visualizations that build intuition far faster than reading specs.
-- **CyberArk Secure Workload Access product docs (GA):** [docs.cyberark.com/secrets-manager-saas/.../ccl-getstarted-swa-lp.htm](https://docs.cyberark.com/secrets-manager-saas/latest/en/content/conjurcloud/ccl-getstarted-swa-lp.htm).
+- [@infamousjoeg](https://github.com/infamousjoeg) (Joe Garcia, Palo Alto Networks)
 
----
+## License
 
-## Security and license
-
-**Secrets handling.** No secret material is committed to this repo, and `make doctor` enforces that posture (any `.envrc` containing CLIENT_ID/SECRET would be flagged). Service User credentials live in the macOS Keychain via [Conceal](https://github.com/cyberark/conceal); every tenant-touching command is wrapped in [`summon -p conceal_summon`](https://github.com/cyberark/summon), which injects them as env vars for that subprocess only. Never on disk in cleartext, never visible to `ps`. The SM operator token has an ~8 min TTL and is re-minted per Make target invocation rather than cached.
-
-**In-cluster trust.** mTLS authorizers between the portal and carrier services use explicit [`tlsconfig.AuthorizeID(peerSPIFFE)`](https://pkg.go.dev/github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig#AuthorizeID), never `AuthorizeAny` or `AuthorizeMemberOf`. The Conjur policy scopes the carrier's SPIFFE ID to read+execute on exactly one variable (`swa-demo/carrier/api-key`), not a glob or pattern. The only cluster-wide RBAC permission granted is `TokenReview`, required by the `k8s_psat` node attestor.
-
-**Vulnerability reporting.** This is a demo, not a production deployment. If you spot a security issue please open a GitHub issue (or contact the maintainer directly for anything you'd rather not file publicly).
-
-**License.** [Apache 2.0](LICENSE). Third-party component attribution in [NOTICE](NOTICE).
+Apache 2.0. See [LICENSE](LICENSE) for the full text, and [NOTICE](NOTICE) for third-party component attribution.

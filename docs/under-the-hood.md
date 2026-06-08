@@ -1,10 +1,14 @@
-# Deploy Secure Workload Access (SWA) on a Macbook
+# Under the hood: what `make up` does, step by step
 
-This guide walks you from a clean Apple Silicon Macbook to a running SWA Server + SWA Agent. It uses the artifacts shipped in `swa-release-1.0.4/` (which is gitignored -- treat it as a vendor drop) and the official docs mirrored under [`swa-docs/`](swa-docs/INDEX.md).
+> **Audience:** engineers who want to understand or hand-step through the
+> SWA deploy. For the one-command path, see the [README](../README.md).
+> For SWA concepts (SPIFFE, SVIDs, attestation), see the
+> [Wiki Concepts page](https://github.com/infamousjoeg/idira-swa-demo/wiki/Concepts).
 
-> **What "deploy on a Macbook" actually means.** SWA Server runs on **Kubernetes**, and the issuing/signing side of SWA depends on a **CyberArk Secrets Manager - SaaS tenant** (the "control plane"). You can run the Mac-side pieces -- a local Kubernetes cluster (kind), the Helm charts, the Terraform provider, and the agent binary -- entirely on your laptop, but for SWA to actually issue identities end-to-end you need a tenant URL and an admin access token. This guide covers both **Path A: local sandbox** (just exercise the bundle, no tenant) and **Path B: full deploy** (with a real tenant).
-
----
+This document unrolls the `make up` and `make portforward` targets into the
+raw `helm install`, `terraform apply`, and `curl` invocations they wrap, so
+you can run them by hand for learning, debugging, or porting to a
+non-Make environment.
 
 ## 0. Confirmed environment
 
@@ -41,7 +45,7 @@ docker version --format '{{.Server.Version}}'   # should print, e.g., 29.5.2
 
 For Path B (full deploy) you additionally need:
 
-- A CyberArk Secrets Manager - SaaS tenant with **Secure Workload Access** entitlement and the Secrets Manager **Admin** role.
+- An Idira Secrets Manager - SaaS tenant with **Secure Workload Access** entitlement and the Secrets Manager **Admin** role.
 - A bearer token (the docs call it `TOKEN`); the auth flow is documented at [docs.cyberark.com → Authenticate user](https://docs.cyberark.com/early-release/swa/en/content/developer/conjur_api_authenticate_user.htm).
 - Your tenant subdomain. The SWA API base is `https://<subdomain>.secretsmgr.cyberark.cloud`.
 
@@ -53,6 +57,8 @@ Use this to verify that the bundle, charts, and Terraform provider are all sound
 
 ### 2.1 Create a kind cluster
 
+(equivalent to: `make cluster`)
+
 ```bash
 cd swa-release-1.0.4
 kind create cluster --name swa --image kindest/node:v1.34.0
@@ -60,6 +66,8 @@ kubectl cluster-info --context kind-swa
 ```
 
 ### 2.2 Load the SWA images into kind
+
+(equivalent to: `make images`)
 
 The Makefile target loads every `.tar` in `container-images/`:
 
@@ -118,6 +126,8 @@ kubectl -n swa-system get pods,daemonsets
 
 ### 2.5 Install the Terraform provider locally
 
+(equivalent to: `make install-tf-provider`)
+
 This installs the provider into `~/.terraform.d/plugins/registry.terraform.io/cyberark/swa/<version>/darwin_arm64/` so any local Terraform config can use it:
 
 ```bash
@@ -142,7 +152,7 @@ kind delete cluster --name swa
 
 ## 3. Path B -- Full deploy against a Secrets Manager - SaaS tenant
 
-This follows [Get started with SWA on Kubernetes](swa-docs/pages/ccl-swa-getstarted-k8.md) and [Install SWA on Kubernetes with Helm](swa-docs/pages/ccl-swa-install-helm.md), specialized for a kind cluster on your laptop.
+This follows [Get started with SWA on Kubernetes](../swa-docs/pages/ccl-swa-getstarted-k8.md) and [Install SWA on Kubernetes with Helm](../swa-docs/pages/ccl-swa-install-helm.md), specialized for a kind cluster on your laptop.
 
 ### 3.1 Shell variables
 
@@ -161,6 +171,8 @@ export SERVER_NAME="swa-server-mac"
 The `Authorization` header is `Token token="${TOKEN}"` (note the literal `token="..."` form -- not a plain `Bearer`). The `Accept` header must be `application/x.secretsmgr.v2+json`.
 
 ### 3.2 Create the SPIFFE hierarchy
+
+(equivalent to: `make tf-apply-platform` -- the Terraform provider creates trust domain, server group, node group, and server registration in one apply)
 
 ```bash
 # 1. Trust domain
@@ -201,6 +213,8 @@ curl -sS -X POST "${SWA_API_BASE}/api/swa/trust-domains/${TRUST_DOMAIN_NAME}/ser
 
 ### 3.3 Discover the kind cluster's OIDC config (used to register the server)
 
+(cluster + image-load equivalent to: `make cluster && make images`)
+
 ```bash
 kind create cluster --name swa --image kindest/node:v1.34.0
 cd swa-release-1.0.4 && make kind-load-images KIND_CLUSTER=swa
@@ -217,6 +231,8 @@ Save the `issuer` and `jwks_uri` values.
 > ```
 
 ### 3.4 Register the SWA Server
+
+(also covered by `make tf-apply-platform`)
 
 ```bash
 curl -sS -X POST "${SWA_API_BASE}/api/swa/trust-domains/${TRUST_DOMAIN_NAME}/server-groups/${SERVER_GROUP_NAME}/servers" \
@@ -243,6 +259,8 @@ export AUTHN_ID="<authn_id from above>"
 
 ### 3.5 Install the SWA Server chart against the real tenant
 
+(equivalent to: `make install-server`)
+
 ```bash
 helm install swa-server ./helm/swa-server-0.1.0.tgz \
   --namespace swa-system --create-namespace \
@@ -266,6 +284,8 @@ A healthy server logs successful authentication against the control plane and ex
 
 ### 3.6 Install the SWA Agent
 
+(equivalent to: `make install-agent`)
+
 ```bash
 helm install swa-agent ./helm/swa-agent-0.1.0.tgz \
   --namespace swa-system \
@@ -279,7 +299,7 @@ helm install swa-agent ./helm/swa-agent-0.1.0.tgz \
   --set podLabels.swa_nodegroup="${NODE_GROUP_NAME}"
 ```
 
-The `podLabels.swa_nodegroup` value **must** match the `NODE_GROUP_NAME` -- the SPIFFE ID template on the server is what stitches them together. See [Design and assign SWA node groups](swa-docs/pages/ccl-swa-node-groups-design.md).
+The `podLabels.swa_nodegroup` value **must** match the `NODE_GROUP_NAME` -- the SPIFFE ID template on the server is what stitches them together. See [Design and assign SWA node groups](../swa-docs/pages/ccl-swa-node-groups-design.md).
 
 ---
 
@@ -293,7 +313,7 @@ kubectl -n swa-system run svid-probe --rm -it --restart=Never \
   --overrides='{"spec":{"volumes":[{"name":"sock","hostPath":{"path":"/tmp/swa-agent"}}],"containers":[{"name":"svid-probe","image":"alpine:3.20","command":["sh","-c","apk add --no-cache curl && ls -la /sock/public/api.sock && sleep 30"],"volumeMounts":[{"name":"sock","mountPath":"/sock"}]}]}}'
 ```
 
-If `api.sock` exists and is owned by `65532:65532`, the agent is healthy. The actual SVID-fetch wire format is a gRPC call against the SPIFFE Workload API -- the bundled `swa-agent` binary under `binaries/` includes a client subcommand you can copy in and invoke (see [Install an SWA agent on a machine](swa-docs/pages/ccl-swa-install-agent-machine.md) for the `swa-agent api fetch jwt --audience ... --socketPath ...` syntax).
+If `api.sock` exists and is owned by `65532:65532`, the agent is healthy. The actual SVID-fetch wire format is a gRPC call against the SPIFFE Workload API -- the bundled `swa-agent` binary under `binaries/` includes a client subcommand you can copy in and invoke (see [Install an SWA agent on a machine](../swa-docs/pages/ccl-swa-install-agent-machine.md) for the `swa-agent api fetch jwt --audience ... --socketPath ...` syntax).
 
 ---
 
@@ -304,7 +324,7 @@ If `api.sock` exists and is owned by `65532:65532`, the agent is healthy. The ac
 | Server pod CrashLoopBackOff | `kubectl -n swa-system logs deploy/swa-server` -- usually `controlPlane.url` typo, missing `authn_id`, or `RBAC` missing `TokenReview` |
 | Agent pod stuck `Init` | Init container fixes `/tmp/swa-agent` permissions to `65532:65532`; check kind node has `hostPath` enabled (default) |
 | Agent runs but never attests | Server's `service_account_allow_list` / `cluster` mismatch -- re-check the values you posted in §3.2 |
-| `k8s` workload attestor 403 from kubelet | See the [Troubleshoot SWA](swa-docs/pages/ccl-swa-troubleshooting.md) page; kind sometimes serves kubelet over a self-signed cert |
+| `k8s` workload attestor 403 from kubelet | See the [Troubleshoot SWA](../swa-docs/pages/ccl-swa-troubleshooting.md) page; kind sometimes serves kubelet over a self-signed cert |
 
 Useful one-liners:
 
@@ -317,6 +337,8 @@ kubectl -n swa-system describe pod -l app.kubernetes.io/name=swa-server
 ---
 
 ## 6. Cleanup
+
+(equivalent to: `make down` -- which additionally destroys tenant-side Terraform state with retry-on-token-expiry)
 
 ```bash
 helm -n swa-system uninstall swa-agent swa-server || true

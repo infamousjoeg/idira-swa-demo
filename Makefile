@@ -21,12 +21,15 @@ TF           := terraform -chdir=platform/terraform
 SUMMON = summon -p conceal_summon --yaml "$$(printf 'CLIENT_ID: !var %s/client_id\nCLIENT_SECRET: !var %s/client_secret' '$(CONCEAL_NAMESPACE)' '$(CONCEAL_NAMESPACE)')"
 
 .DEFAULT_GOAL := help
-.PHONY: help doctor tf-token down install-tf-provider cluster images \
+.PHONY: help setup doctor tf-token down install-tf-provider cluster images \
         tf-init tf-apply-platform install-server install-agent smoke-m1 \
         up-m1 _check-env
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z0-9_-]+:.*##/{printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+setup: ## First-time guided onboarding (installs tools, builds .envrc, stores secrets)
+	@./scripts/setup.sh $(SETUP_FLAGS)
 
 doctor: ## Verify prerequisites
 	@./scripts/doctor.sh

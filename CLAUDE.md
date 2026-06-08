@@ -1,16 +1,34 @@
 # Maintainer notes -- idira-swa-demo
 
-This file is project guidance for anyone (human or otherwise) working in this repo. It documents the structural facts about the CyberArk Secure Workload Access (SWA) release distribution that this sandbox demonstrates: what the release contains, how to deploy it locally, and how the in-cluster components fit together. The information is not duplicated in README.md (user-facing) or DEPLOY_MACOS.md (step-by-step walkthrough); both link back here for component-level depth.
+This file is project guidance for anyone (human or otherwise) working in this repo. It documents the structural facts about the Idira Secure Workload Access (SWA) release distribution that this sandbox demonstrates: what the release contains, how to deploy it locally, and how the in-cluster components fit together. The information is not duplicated in README.md (user-facing) or docs/under-the-hood.md (step-by-step walkthrough); both link back here for component-level depth.
 
 ## Repository nature
 
-This repo is a sandbox for working with the **CyberArk Secure Workload Access (SWA)** release distribution, not a source-code project. The tracked content is documentation and a Mac deploy guide; the actual release contents live under `swa-release-1.0.4/`, which is **gitignored**. Treat `swa-release-1.0.4/` as a vendor-provided artifact: read it, extract from it, run its scripts, but don't `git add` inside it without also intending to change `.gitignore`.
+This repo is a sandbox for working with the **Idira Secure Workload Access (SWA)** release distribution, not a source-code project. The tracked content is documentation and a Mac deploy guide; the actual release contents live under `swa-release-1.0.4/`, which is **gitignored**. Treat `swa-release-1.0.4/` as a vendor-provided artifact: read it, extract from it, run its scripts, but don't `git add` inside it without also intending to change `.gitignore`.
 
 There is no application code to build, lint, or test here. The commands below are operational: loading container images, installing charts, installing a Terraform provider.
 
+## Onboarding flow (canonical)
+
+A first-time user runs, in order:
+
+- `make setup` (interactive; six phases; installs missing tools via Homebrew
+  with consent, builds `.envrc` from `.envrc.example`, stores Service User
+  credentials in Keychain via `conceal set`, and as its final phase invokes
+  `make doctor` to verify the result).
+- `make up` (canonical deploy; M1 + M2 + M3 milestones; depends on
+  `make doctor` so it is also a safe trust-but-verify entry point).
+- `make portforward PORT=18080` (open the portal on a non-default port
+  to avoid common 8080 collisions).
+
+`make doctor` is idempotent and safe to re-run on its own at any time;
+because `make setup` and `make up` both invoke it, you rarely need to
+call it directly. `scripts/setup.sh` is the source of truth for "how
+do I get there"; it does not touch the tenant or run any deploy step.
+
 ## Where the knowledge lives
 
-- **[`DEPLOY_MACOS.md`](DEPLOY_MACOS.md)** -- runnable end-to-end Mac walkthrough that ties the bundle artifacts to a kind cluster, with both a sandbox path (no tenant) and a full-deploy path (against a Secrets Manager - SaaS tenant). This is the right starting point for any "make SWA work on this laptop" request.
+- **[`docs/under-the-hood.md`](docs/under-the-hood.md)** -- runnable end-to-end Mac walkthrough that ties the bundle artifacts to a kind cluster, with both a sandbox path (no tenant) and a full-deploy path (against a Secrets Manager - SaaS tenant). This is the right starting point for any "make SWA work on this laptop" request.
 - **[`swa-docs/INDEX.md`](swa-docs/INDEX.md)** -- local mirror of the upstream early-release docs (12 pages from `docs.cyberark.com/early-release/swa/.../conjurcloud/`). Each page in `swa-docs/pages/` keeps its upstream URL in its frontmatter under `source:`. Prefer reading these over re-fetching; if a question turns on something that might be newer than the mirror, refetch the page named in the frontmatter rather than guessing.
 - **[`swa-docs/raw/`](swa-docs/raw/)** -- original rendered HTML for each crawled page (JSON-encoded strings, captured via Playwright since the docs site is a JS-rendered MadCap Flare SPA). Keep for traceability; humans should read `pages/*.md`.
 
@@ -75,7 +93,7 @@ tar xzf helm/swa-server-0.1.0.tgz -C /tmp/ && cat /tmp/swa-server/values.yaml
 
 SWA splits into three layers. **You can't do a real end-to-end deploy with the bundle alone**; the control plane is a SaaS tenant the bundle has no copy of.
 
-1. **Control plane (SaaS, not in this bundle).** A CyberArk **Secrets Manager - SaaS** tenant at `https://<subdomain>.secretsmgr.cyberark.cloud`. Holds the SPIFFE hierarchy (trust domain -> server group -> node group -> server) and signs SVIDs. Reached via REST under `/api/swa` with header `Authorization: Token token="<token>"` and `Accept: application/x.secretsmgr.v2+json`. SWA's Terraform provider talks to this layer.
+1. **Control plane (SaaS, not in this bundle).** An Idira **Secrets Manager - SaaS** tenant at `https://<subdomain>.secretsmgr.cyberark.cloud`. Holds the SPIFFE hierarchy (trust domain -> server group -> node group -> server) and signs SVIDs. Reached via REST under `/api/swa` with header `Authorization: Token token="<token>"` and `Accept: application/x.secretsmgr.v2+json`. SWA's Terraform provider talks to this layer.
 2. **SWA Server (in-cluster Deployment).** Authenticates to the control plane via JWT (projected SA token at `/var/run/secrets/tokens/swa-token`, audience `conjur`; the audience string is still `conjur` even though the SaaS product is "Secrets Manager"). Listens on `:8443` (gRPC/API for agents) and `:8080` (web). With `rbac.createTokenReviewRole=true`, gets the cluster-wide `TokenReview` permission required by the `k8s_psat` node attestor. Trust roots persisted at `/var/swa/certs`. To register a server, you POST `authentication.data` containing the cluster's OIDC `issuer` and either `jwks_uri` (tenant pulls) or inline `public_keys` (tenant validates locally; use this on a laptop, the tenant can't reach your kind API server).
 3. **SWA Agent (in-cluster DaemonSet, or stand-alone on a VM).** Per-node. Attests workloads and exposes a SPIFFE Workload API socket at `/tmp/swa-agent/public/api.sock` (via `hostPath`) so co-located workload pods can fetch SVIDs. Requires `hostPID: true` (read `/proc` for workload attestation), `hostNetwork: true` (reach the kubelet API for the `k8s` workload attestor), and `dnsPolicy: ClusterFirstWithHostNet`. Runs as non-root uid/gid `65532`; an init container fixes socket-dir permissions.
 
@@ -96,7 +114,7 @@ The agent's `podLabels.swa_nodegroup` is referenced by the server's SPIFFE ID te
 
 ## Platform notes
 
-- **macOS (Apple Silicon):** use the `*-arm64v8` image tarballs. `make kind-load-images` loads both architectures into the kind node; only the arm64 ones run. Full step-by-step is in [`DEPLOY_MACOS.md`](DEPLOY_MACOS.md).
+- **macOS (Apple Silicon):** use the `*-arm64v8` image tarballs. `make kind-load-images` loads both architectures into the kind node; only the arm64 ones run. Full step-by-step is in [`docs/under-the-hood.md`](docs/under-the-hood.md).
 - **EKS:** set `setNodeNameEnv: false` on the agent. Instance-ID node names don't resolve via DNS; with `hostNetwork: true` the agent falls back to `127.0.0.1` to reach the kubelet.
 - **OpenShift:** use `push-openshift-images` (logs into the internal registry with the `oc` token) rather than `push-images`. Provide `OS_PROJECT` if not using the default `swa`.
 - **Windows:** the bash installer refuses MINGW/MSYS/CYGWIN; use `install-terraform-provider.ps1`.

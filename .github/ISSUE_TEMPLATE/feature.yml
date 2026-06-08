@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest a change to the demo.
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What you would like to see
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters / who benefits
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you have considered
+  - type: dropdown
+    id: willing-to-pr
+    attributes:
+      label: Are you willing to send a PR?
+      options: ["yes", "maybe", "no"]
