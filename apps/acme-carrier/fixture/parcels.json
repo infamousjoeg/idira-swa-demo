@@ -1,0 +1,9 @@
+{
+  "ACM-2049-883": {
+    "parcel_id": "ACM-2049-883",
+    "origin": "Singapore",
+    "destination": "Long Beach",
+    "eta": "2026-06-09T14:00:00Z",
+    "carrier_name": "Acme Couriers"
+  }
+}
