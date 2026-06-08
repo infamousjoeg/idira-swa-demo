@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: acme-carrier
+  namespace: acme-external
+  labels: {app: acme-carrier}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: acme-carrier}}
+  template:
+    metadata:
+      labels: {app: acme-carrier}
+      # NOTE: no swa_nodegroup label. This workload is NOT a SWA workload
+      # and the swa-agent must not attempt to attest it.
+    spec:
+      containers:
+        - name: acme-carrier
+          image: idira/acme-carrier:m7
+          imagePullPolicy: IfNotPresent
+          ports:
+            - {name: mtls,   containerPort: 8443}
+            - {name: health, containerPort: 8444}
+          readinessProbe:
+            httpGet: {path: /healthz, port: health}
+            initialDelaySeconds: 1
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
