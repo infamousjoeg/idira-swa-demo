@@ -466,6 +466,7 @@ body {
 .card-host.foreign .stage-rect {
   stroke: var(--panw-orange);
   stroke-dasharray: 4 4;
+  fill: rgba(250, 88, 45, 0.05);  /* matches .tile-boundary fill so the ACME card is click-anywhere, not just on the 1px border */
 }
 .label-foreign {
   fill: var(--panw-orange);
