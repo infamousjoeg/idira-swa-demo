@@ -23,6 +23,7 @@ platform/helm/*.values.yaml
 # Built binaries (produced by `make build-*`)
 apps/carrier/carrier
 apps/portal/portal
+apps/acme-carrier/acme-carrier
 
 # UI test artifacts
 ui-tests/node_modules/
