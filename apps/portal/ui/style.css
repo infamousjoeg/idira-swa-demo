@@ -430,6 +430,7 @@ body {
    ALL CAPS labels matching the CTA chrome (spec §10.4). */
 .seg {
   display: inline-flex;
+  align-self: flex-start; /* parent .resolve is flex column; without this the selector stretches to the form width */
   border: 1px solid var(--text);
   margin: 6px 0 18px 0;
 }
