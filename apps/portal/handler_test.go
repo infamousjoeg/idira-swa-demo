@@ -31,7 +31,7 @@ func TestResolve_ProxiesCarrierResponse(t *testing.T) {
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	handleResolve(c, bus)(w, r)
+	handleResolve(c, &stubExternal{}, bus)(w, r)
 
 	if w.Code != 200 {
 		t.Fatalf("status: %d", w.Code)
@@ -46,7 +46,7 @@ func TestResolve_BadJSONReturns400(t *testing.T) {
 		strings.NewReader(`not-json`))
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
-	handleResolve(&stubCarrier{}, NewTraceBus(2))(w, r)
+	handleResolve(&stubCarrier{}, &stubExternal{}, NewTraceBus(2))(w, r)
 	if w.Code != 400 {
 		t.Errorf("status: %d", w.Code)
 	}
@@ -57,7 +57,7 @@ func TestResolve_CarrierErrorReturns502(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/resolve",
 		strings.NewReader(`{"shipment_id":"SHP-2049-883"}`))
-	handleResolve(c, NewTraceBus(2))(w, r)
+	handleResolve(c, &stubExternal{}, NewTraceBus(2))(w, r)
 	if w.Code != 502 {
 		t.Errorf("status: %d", w.Code)
 	}
@@ -66,7 +66,7 @@ func TestResolve_CarrierErrorReturns502(t *testing.T) {
 func TestResolve_NotPOSTReturns405(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/resolve", nil)
-	handleResolve(&stubCarrier{}, NewTraceBus(2))(w, r)
+	handleResolve(&stubCarrier{}, &stubExternal{}, NewTraceBus(2))(w, r)
 	if w.Code != 405 {
 		t.Errorf("status: %d", w.Code)
 	}
@@ -100,4 +100,56 @@ func decodedResolveReq(t *testing.T, body io.Reader) resolveReq {
 		t.Fatalf("decode: %v", err)
 	}
 	return r
+}
+
+// stubExternal implements externalAPI for handler_test.
+type stubExternal struct {
+	called    bool
+	shipment  string
+	returnErr error
+}
+
+func (s *stubExternal) Resolve(_ context.Context, id string) error {
+	s.called = true
+	s.shipment = id
+	return s.returnErr
+}
+
+func TestHandleResolve_DispatchesToExternal(t *testing.T) {
+	bus := NewTraceBus(32)
+	internal := &stubCarrier{} // existing stub from M3 tests
+	external := &stubExternal{returnErr: errAcmeUntrusted}
+
+	body := strings.NewReader(`{"shipment_id":"SHP-2049-883","carrier":"external"}`)
+	req := httptest.NewRequest(http.MethodPost, "/resolve", body)
+	rr := httptest.NewRecorder()
+	handleResolve(internal, external, bus)(rr, req)
+
+	if !external.called {
+		t.Error("external client was not called for carrier=external")
+	}
+	if external.shipment != "SHP-2049-883" {
+		t.Errorf("external got shipment %q, want SHP-2049-883", external.shipment)
+	}
+	if rr.Code != http.StatusBadGateway {
+		t.Errorf("status = %d, want 502 (errAcmeUntrusted)", rr.Code)
+	}
+}
+
+func TestHandleResolve_DefaultsToInternal(t *testing.T) {
+	bus := NewTraceBus(32)
+	internal := &stubCarrier{body: []byte(`{}`), code: http.StatusOK}
+	external := &stubExternal{}
+
+	body := strings.NewReader(`{"shipment_id":"SHP-2049-883"}`) // no carrier field
+	req := httptest.NewRequest(http.MethodPost, "/resolve", body)
+	rr := httptest.NewRecorder()
+	handleResolve(internal, external, bus)(rr, req)
+
+	if external.called {
+		t.Error("external client was called for missing carrier field; should default internal")
+	}
+	if rr.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rr.Code)
+	}
 }

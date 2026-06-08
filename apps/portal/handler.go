@@ -14,6 +14,13 @@ type carrierAPI interface {
 	Lookup(ctx context.Context, shipmentID string) (body []byte, code int, err error)
 }
 
+// externalAPI is the surface handleResolve needs from ExternalCarrierClient.
+// Defined as an interface so handler_test.go can substitute a stub without
+// standing up a TLS handshake.
+type externalAPI interface {
+	Resolve(ctx context.Context, shipmentID string) error
+}
+
 var errCarrierDown = errors.New("carrier unreachable")
 
 type resolveReq struct {
@@ -24,7 +31,7 @@ type resolveReq struct {
 	Carrier string `json:"carrier,omitempty"`
 }
 
-func handleResolve(c carrierAPI, bus *TraceBus) http.HandlerFunc {
+func handleResolve(c carrierAPI, x externalAPI, bus *TraceBus) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -35,8 +42,26 @@ func handleResolve(c carrierAPI, bus *TraceBus) http.HandlerFunc {
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
+		carrier := req.Carrier
+		if carrier == "" {
+			carrier = "internal"
+		}
 		bus.Emit(traceEvent{Source: "portal", Type: "portal.resolve.requested",
-			Payload: map[string]any{"id": req.ShipmentID}})
+			Payload: map[string]any{"id": req.ShipmentID, "carrier": carrier}})
+
+		if carrier == "external" {
+			if err := x.Resolve(r.Context(), req.ShipmentID); err != nil {
+				bus.Emit(traceEvent{Source: "portal", Type: "portal.resolve.rejected",
+					Payload: map[string]any{"reason": "trust_boundary"}})
+				http.Error(w, "external carrier rejected at trust boundary", http.StatusBadGateway)
+				return
+			}
+			// Unexpected success -- still 502 because the demo expects rejection.
+			bus.Emit(traceEvent{Source: "portal", Type: "portal.resolve.rejected",
+				Payload: map[string]any{"reason": "unexpected_ok"}})
+			http.Error(w, "external carrier handshake unexpectedly succeeded", http.StatusBadGateway)
+			return
+		}
 
 		body, code, err := c.Lookup(r.Context(), req.ShipmentID)
 		if err != nil {
