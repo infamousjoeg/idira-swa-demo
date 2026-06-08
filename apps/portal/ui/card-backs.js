@@ -13,6 +13,17 @@
 
 import { cachedEvent, cachedIdentity } from './flip-controller.js';
 
+// M7: foreignCertState holds the bits we can plausibly show for the ACME
+// flip-card back. The portal's /identity endpoint does NOT include the foreign
+// peer's cert (it is rejected before any handshake data is trusted), so we
+// synthesize the back from the SAN URI captured off the
+// CertificateVerificationError and the static facts the spec guarantees about
+// the Acme issuer. Populated by diagram.js on mtls.peer_uri_seen, cleared on
+// resetDiagram() / carrier toggle back to Internal.
+let foreignCertState = null;
+export function setForeignCertState(s) { foreignCertState = s; }
+export function clearForeignCertState() { foreignCertState = null; }
+
 function escapeHTML(s) {
   if (s == null) return '';
   return String(s)
@@ -78,6 +89,21 @@ export function renderPortalX509Back() {
 }
 
 export function renderCarrierX509Back() {
+  // M7: when the carrier card is showing a foreign-TD peer, the back shows
+  // what we honestly know about the rejected cert (SAN URI from the
+  // CertificateVerificationError; issuer/sig-alg/validity are guarantees of
+  // the spec, not values we trust the peer for).
+  if (foreignCertState) {
+    return `<div class="card-back">
+    <div class="card-back__eyebrow">ACME &middot; X.509 (REJECTED)</div>
+    ${row('subject', '(empty -- SPIFFE identity in SAN URI)')}
+    ${row('issuer', 'CN=acme.courier root')}
+    ${row('san uri', foreignCertState.uri || '')}
+    ${row('sig alg', 'ECDSA-SHA256')}
+    ${row('validity', '~90 days (regenerated on pod restart)')}
+    <div class="card-back__v" style="margin-top: 10px; font-style: italic; opacity: 0.7;">This cert was rejected by your SWA trust bundle. It is NOT trusted; you are looking at it for educational purposes.</div>
+  </div>`;
+  }
   const id = cachedIdentity();
   // mTLS err is the surface failure for the carrier X.509 card.
   const err = cachedEvent('mtls.handshake.err');

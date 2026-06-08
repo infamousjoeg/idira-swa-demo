@@ -9,7 +9,7 @@
 import { setIssuedAndExp, subscribe as subscribeTTL, formatMSS } from './ttl-ticker.js';
 import { subscribe as subscribeTrace, onStateChange, skip as skipPace } from './pace-queue.js';
 import { flipTo, currentlyFlipped, onFlipChange } from './flip-controller.js';
-import { renderBack } from './card-backs.js';
+import { renderBack, setForeignCertState, clearForeignCertState } from './card-backs.js';
 
 const root = document.getElementById('diagram');
 if (root) renderSkeleton(root);
@@ -50,6 +50,10 @@ export function resetDiagram() {
     eyebrow.classList.remove('eyebrow-rejected');
     eyebrow.textContent = 'mTLS';
   }
+
+  // Drop the cached foreign cert details so the carrier card-back flips back
+  // to the internal X.509 view.
+  clearForeignCertState();
 
   // Walk the existing replay-reset so stage cards return to idle and identity
   // re-paints. paintIdentity restores the internal carrier SAN URI.
@@ -354,6 +358,8 @@ const DISPATCH = {
       san2.textContent = slash >= 0 ? uri.slice(slash + 1) : '';
       san2.classList.add('uri-foreign');
     }
+    // Stash the foreign cert state for the card-back ACME renderer.
+    setForeignCertState({ uri });
   },
   'mtls.handshake.err': (ev) => {
     // M7: if the right card is already painted foreign (peer_uri_seen fired
