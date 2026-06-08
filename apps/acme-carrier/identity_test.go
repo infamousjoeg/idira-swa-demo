@@ -77,3 +77,25 @@ func TestMintIdentity_LeafIsTLSCertificate(t *testing.T) {
 	}
 	_ = tls.Certificate(*cert) // compile-time assertion
 }
+
+func TestMintIdentity_LeafHasClusterDNSName(t *testing.T) {
+	cert, err := mintIdentity()
+	if err != nil {
+		t.Fatalf("mintIdentity: %v", err)
+	}
+	leaf, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		t.Fatalf("parse leaf: %v", err)
+	}
+	want := "acme-carrier.acme-external.svc.cluster.local"
+	found := false
+	for _, name := range leaf.DNSNames {
+		if name == want {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("leaf DNSNames = %v, want to contain %q (so Go's hostname check passes and chain validation is what fails)", leaf.DNSNames, want)
+	}
+}

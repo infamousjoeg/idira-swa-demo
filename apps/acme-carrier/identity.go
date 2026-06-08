@@ -70,6 +70,14 @@ func mintIdentity() (*tls.Certificate, error) {
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		URIs:         []*url.URL{spiffeURI},
+		// DNSNames lets Go's TLS verifier pass its hostname check so that chain
+		// validation runs and produces the spec's expected "unknown authority"
+		// error. Without this, the verifier rejects at hostname-mismatch first
+		// (different reason for the same outcome -- demo breaks because the
+		// eyebrow caption can't distinguish the two failure modes). The SPIFFE
+		// identity still lives in the SAN URI above; the DNS SAN exists only
+		// so verification reaches the chain-validation step.
+		DNSNames: []string{"acme-carrier.acme-external.svc.cluster.local"},
 	}
 	leafDER, err := x509.CreateCertificate(rand.Reader, leafTmpl, caCert, &leafKey.PublicKey, caKey)
 	if err != nil {
