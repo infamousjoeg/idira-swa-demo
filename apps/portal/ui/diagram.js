@@ -10,6 +10,7 @@ import { setIssuedAndExp, subscribe as subscribeTTL, formatMSS } from './ttl-tic
 import { subscribe as subscribeTrace, onStateChange, skip as skipPace } from './pace-queue.js';
 import { flipTo, currentlyFlipped, onFlipChange } from './flip-controller.js';
 import { renderBack, setForeignCertState, clearForeignCertState } from './card-backs.js';
+import { renderRejection } from './evidence.js';
 
 const root = document.getElementById('diagram');
 if (root) renderSkeleton(root);
@@ -312,6 +313,11 @@ const DISPATCH = {
     resetForReplay();
     setRectState('portal-rect', 'lit');
     setHintHidden(true);
+  },
+  'portal.resolve.rejected': () => {
+    // M7: portal handler emitted a foreign-rejection. Swap the trust evidence
+    // panel to the boundary-teaching copy.
+    renderRejection();
   },
   'mtls.handshake.start': () => {
     setConnState('mtls-line', 'lit');

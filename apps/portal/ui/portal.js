@@ -65,11 +65,20 @@ function renderRow(root, k, v) {
   root.append(row);
 }
 
-// M7: reset the diagram + result pane whenever the carrier selector flips.
-// This is the demo's only "reset" affordance per spec section 7.1.
+// M7: reset the diagram + result pane + evidence panel whenever the carrier
+// selector flips. This is the demo's only "reset" affordance per spec
+// section 7.1.
 document.querySelectorAll('input[name="carrier"]').forEach(r => {
   r.addEventListener('change', () => {
     resetDiagram();
     if (result) result.innerHTML = '';
+    const ev = document.getElementById('evidence');
+    if (ev) {
+      ev.hidden = true;
+      ['line1', 'line2', 'line3'].forEach(s => {
+        const el = ev.querySelector(`[data-slot="${s}"]`);
+        if (el) el.innerHTML = '';
+      });
+    }
   });
 });
