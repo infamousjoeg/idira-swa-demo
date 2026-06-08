@@ -425,3 +425,89 @@ body {
   width: 0;
   height: 0;
 }
+
+/* Carrier selector -- segmented control. Square corners, line-only border,
+   ALL CAPS labels matching the CTA chrome (spec §10.4). */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--text);
+  margin: 6px 0 18px 0;
+}
+.seg input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.seg__opt {
+  font: 700 12px/1 var(--font-headline);
+  letter-spacing: 0.14em;
+  padding: 10px 18px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.seg__opt + input + .seg__opt {
+  border-left: 1px solid var(--text);
+}
+.seg input[type="radio"]:checked + .seg__opt {
+  background: var(--text);
+  color: white;
+}
+.seg input[type="radio"]:focus-visible + .seg__opt {
+  outline: 2px solid var(--idira-500);
+  outline-offset: 2px;
+}
+
+/* Foreign trust domain treatment (M7). Used by diagram.js when External is
+   selected. Orange/dashed mirrors the alert-adjacent role of --panw-orange
+   reserved in spec §10.1. */
+.stage-rect.foreign,
+.card-host.foreign .stage-rect {
+  stroke: var(--panw-orange);
+  stroke-dasharray: 4 4;
+}
+.label-foreign {
+  fill: var(--panw-orange);
+}
+.uri-foreign {
+  fill: var(--panw-orange);
+}
+.conn.rejected {
+  stroke: var(--panw-orange);
+  stroke-dasharray: 4 4;
+}
+.eyebrow-rejected {
+  fill: var(--panw-orange);
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  font-size: 9px;
+}
+
+/* Dimmed downstream stack stages */
+.stage-skipped {
+  opacity: 0.25;
+}
+
+/* TRUST BOUNDARY tile (M7) */
+.tile-boundary {
+  fill: rgba(250, 88, 45, 0.05);
+  stroke: var(--panw-orange);
+  stroke-dasharray: 4 4;
+}
+.tile-boundary-label {
+  fill: var(--panw-orange);
+  font-weight: 700;
+  letter-spacing: 2px;
+  font-size: 9px;
+}
+.tile-boundary-body {
+  fill: var(--idira-0);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+/* Result pane -- failed-state copy */
+.result--rejected {
+  color: var(--panw-orange);
+}
