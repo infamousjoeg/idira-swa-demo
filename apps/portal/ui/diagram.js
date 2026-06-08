@@ -160,7 +160,7 @@ function renderSkeleton(host) {
   <!-- mTLS edge -->
   <g id="mtls-edge">
     <line x1="260" y1="205" x2="320" y2="205" class="conn" id="mtls-line" marker-start="url(#arl)" marker-end="url(#arr)"/>
-    <text x="290" y="192" font-size="9" font-weight="700" letter-spacing="1.6" text-anchor="middle" class="label-mute" id="mtls-label">mTLS</text>
+    <text x="290" y="134" font-size="9" font-weight="700" letter-spacing="1.6" text-anchor="middle" class="label-mute" id="mtls-label">mTLS</text>
     <text x="290" y="224" font-family="ui-monospace,Menlo" font-size="8" text-anchor="middle" class="label-idira" id="mtls-cipher"></text>
   </g>
 
