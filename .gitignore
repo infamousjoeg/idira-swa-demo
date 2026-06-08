@@ -5,6 +5,9 @@ swa-release-1.0.4/
 # Local environment
 .envrc
 
+# Superpowers brainstorming session artifacts (visual companion mockups, state)
+.superpowers/
+
 # Terraform local state and lock files
 platform/terraform/.terraform/
 platform/terraform/.terraform.lock.hcl
