@@ -28,7 +28,7 @@ do I get there"; it does not touch the tenant or run any deploy step.
 
 ## Where the knowledge lives
 
-- **[`docs/under-the-hood.md`](docs/under-the-hood.md)** -- runnable end-to-end Mac walkthrough that ties the bundle artifacts to a kind cluster, with both a sandbox path (no tenant) and a full-deploy path (against a Secrets Manager - SaaS tenant). This is the right starting point for any "make SWA work on this laptop" request.
+- **[`docs/under-the-hood.md`](docs/under-the-hood.md)** -- runnable end-to-end Mac walkthrough that ties the bundle artifacts to a kind cluster, with both a sandbox path (no tenant) and a full-deploy path (against a Secrets Manager - SaaS tenant). This is the right starting point for any "make SWA work on this laptop" request. M7's Beat 2 (added 2026-06-08) extends the walkthrough with the foreign-trust-domain rejection path.
 - **[`swa-docs/INDEX.md`](swa-docs/INDEX.md)** -- local mirror of the upstream early-release docs (12 pages from `docs.cyberark.com/early-release/swa/.../conjurcloud/`). Each page in `swa-docs/pages/` keeps its upstream URL in its frontmatter under `source:`. Prefer reading these over re-fetching; if a question turns on something that might be newer than the mirror, refetch the page named in the frontmatter rather than guessing.
 - **[`swa-docs/raw/`](swa-docs/raw/)** -- original rendered HTML for each crawled page (JSON-encoded strings, captured via Playwright since the docs site is a JS-rendered MadCap Flare SPA). Keep for traceability; humans should read `pages/*.md`.
 
@@ -111,6 +111,15 @@ trust domain (e.g., mac.local)
 - `x509pop` -- agent presents an X.509 cert/key from `nodeAttestor.x509pop.certSecret`, or from inline `cert`/`key` values (the chart will render a secret). VM/Ansible deploys default to this; the agent's certificate Subject CN **must equal the node group name** exactly.
 
 The agent's `podLabels.swa_nodegroup` is referenced by the server's SPIFFE ID template; preserve any `podLabels` already set when editing the agent's values, and make sure the value matches the node group name from the control plane.
+
+**Namespaces in the running cluster:**
+
+- `swa-system` -- runs `swa-server` (Deployment) and `swa-agent` (DaemonSet). The Helm charts in the bundle install here.
+- `swa-demo` -- runs the M2/M3 demo apps (`carrier` and `portal`). Both are SWA workloads attested by the local agent; their SVIDs are minted by the in-cluster server.
+- `acme-external` -- runs `acme-carrier`, a deliberately-not-SWA workload used by M7
+  to demonstrate trust-domain boundary rejection. No swa-agent involvement; the pod
+  mints its own self-signed cert in-process. The portal genuinely rejects it via
+  Go's standard verifier when the carrier selector is set to External.
 
 ## Platform notes
 
