@@ -68,6 +68,11 @@ Every lit card is clickable: flip it open to see decoded JWT claims, full X.509 
 
 Full screenshot walkthrough and wire-trace breakdown: [Portal tour](https://github.com/infamousjoeg/idira-swa-demo/wiki/Portal-tour) and [Wire trace](https://github.com/infamousjoeg/idira-swa-demo/wiki/Wire-trace).
 
+- **Demonstrates trust-domain enforcement.** A second carrier in a foreign trust
+  domain (`acme.courier`) is genuinely rejected at the mTLS layer -- no
+  federation simulation, no toggle, just an honest `x509: certificate signed
+  by unknown authority` from Go's standard verifier. See [Beat 2](docs/under-the-hood.md#beat-2--what-happens-at-a-trust-boundary).
+
 ## Architecture
 
 Three layers cooperate to issue and validate identity. An Idira Secrets Manager - SaaS tenant is the control plane: it holds the SPIFFE trust hierarchy, signs SVIDs, and stores the demo secret. An in-cluster SWA Server authenticates to the control plane and serves agents over gRPC. A SWA Agent DaemonSet runs on every node, mints SVIDs for local workloads, and exposes them through a unix-socket Workload API. The demo apps (`carrier` and `portal`) consume those SVIDs to do mTLS and to mint JWT-SVIDs for the Secrets Manager call. The [Architecture deep-dive](https://github.com/infamousjoeg/idira-swa-demo/wiki/Architecture) on the Wiki covers the SPIFFE hierarchy, node attestation modes (`k8s_psat` and `x509pop`), and the control-plane API in full.
