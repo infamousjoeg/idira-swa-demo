@@ -17,7 +17,7 @@ variable "node_group" {
 }
 
 variable "server_name" {
-  description = "SWA server registration name. Used in the chart's controlPlane.auth.loginURL via SWA_AUTHN_ID."
+  description = "SWA server registration name. Used in the chart's controlPlane.auth.authnID via SWA_AUTHN_ID."
   type        = string
   default     = "swa-server-kind"
 }

@@ -80,7 +80,7 @@ make kind-load-images KIND_CLUSTER=<name>
 helm install swa-server ./helm/swa-server/ \
   --namespace swa-system --create-namespace \
   --set controlPlane.url=<...> \
-  --set controlPlane.auth.loginURL=<...> \
+  --set controlPlane.auth.authnID=<...> \    # v1.0.4 chart: loginURL=<...>
   --set rbac.createTokenReviewRole=true
 
 helm install swa-agent ./helm/swa-agent/ \
@@ -110,7 +110,7 @@ SWA splits into three layers. **You can't do a real end-to-end deploy with the b
 trust domain (e.g., mac.local)
   └── server group (one or more, scoped to a node attestor: k8s_psat or x509pop)
         └── node group (defines which workloads can get SVIDs; carries the swa_nodegroup label)
-              └── server (registration creates an authn_id you pass to the chart as controlPlane.auth.loginURL)
+              └── server (registration creates an authn_id you pass to the chart as controlPlane.auth.authnID; v1.0.4 chart called this controlPlane.auth.loginURL)
 ```
 
 **Node attestation** uses one of:

@@ -95,7 +95,7 @@ helm install swa-server ./helm/swa-server-0.1.0.tgz \
   --set image.tag=1.0.0-arm64v8 \
   --set image.pullPolicy=IfNotPresent \
   --set controlPlane.url=https://sandbox.example.invalid \
-  --set controlPlane.auth.loginURL=sandbox-authn \
+  --set controlPlane.auth.authnID=sandbox-authn \
   --set rbac.createTokenReviewRole=true \
   --set trustDomain.name=sandbox.local
 ```
@@ -269,7 +269,7 @@ helm install swa-server ./helm/swa-server-0.1.0.tgz \
   --set image.tag=1.0.0-arm64v8 \
   --set image.pullPolicy=IfNotPresent \
   --set controlPlane.url="${SWA_API_BASE}" \
-  --set controlPlane.auth.loginURL="${AUTHN_ID}" \
+  --set controlPlane.auth.authnID="${AUTHN_ID}" \
   --set rbac.createTokenReviewRole=true \
   --set trustDomain.name="${TRUST_DOMAIN_NAME}"
 ```

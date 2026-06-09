@@ -6,7 +6,7 @@ terraform {
       # Pin to the bundled version (verified via `install-terraform-provider.sh`
       # output). The bundled binary is the only published artifact -- there is
       # no public registry release.
-      version = "0.1.0-0d54f57b-758"
+      version = "0.1.0-c2081762-821"
     }
     external = {
       source  = "hashicorp/external"

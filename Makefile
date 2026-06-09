@@ -101,11 +101,11 @@ tf-apply-platform: _check-env tf-init ## Apply TF subset #1: SPIFFE hierarchy + 
 	      -target=swa_server_group.kind_sg \
 	      -target=swa_node_group.kind_ng \
 	      -target=swa_server.kind'
-	@$(TF) output -json | jq -r '"login_url = " + .login_url.value'
+	@$(TF) output -json | jq -r '"authn_id = " + .authn_id.value'
 
 install-server: unpack tf-apply-platform ## Render values and install/upgrade swa-server (waits for ready)
 	@PANW_SM_URL=$(PANW_SM_URL) \
-	  SWA_LOGIN_URL=$$($(TF) output -raw login_url) \
+	  SWA_AUTHN_ID=$$($(TF) output -raw authn_id) \
 	  SWA_IMAGE_TAG=$$(./scripts/derive-image-tag.sh) \
 	  envsubst < platform/helm/swa-server.values.yaml.tmpl \
 	  > platform/helm/swa-server.values.yaml

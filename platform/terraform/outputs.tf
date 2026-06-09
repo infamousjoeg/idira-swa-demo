@@ -1,11 +1,10 @@
-# The bundled provider exports the server registration ID as `login_url`
-# (a plausible alternative name like `authn_id` does NOT exist in the
-# schema). This is the value the server chart consumes as
-# controlPlane.auth.loginURL (via SWA_AUTHN_ID env substitution in
+# The bundled v1.0.0 provider exports the server registration ID as `authn_id`
+# (renamed from `login_url` in v1.0.4). This is the value the server chart
+# consumes as controlPlane.auth.authnID (via SWA_AUTHN_ID env substitution in
 # platform/helm/swa-server.values.yaml.tmpl).
-output "login_url" {
-  description = "swa_server.kind.login_url -- Conjur login URL for this SWA server registration. Substituted into the helm chart as controlPlane.auth.loginURL."
-  value       = swa_server.kind.login_url
+output "authn_id" {
+  description = "swa_server.kind.authn_id -- SM authentication ID for this SWA server registration. Substituted into the helm chart as controlPlane.auth.authnID."
+  value       = swa_server.kind.authn_id
 }
 
 # The IDs are useful for debugging via the SM REST API.

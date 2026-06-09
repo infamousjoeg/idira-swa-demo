@@ -103,12 +103,24 @@ else
 fi
 
 step 'workload key type is RSA (not EC) in agent configmap'
+# v1.0.4: chart rendered agent.key.type / workload.key.type into the configmap;
+# default was ECP256 which the SM JWT authenticator rejects, so we overrode to
+# RSA2048 and this check enforced the override. v1.0.0: chart no longer exposes
+# those knobs (templates/configmap.yaml), so a substring match for "RSA" always
+# fails. The functional question (does workload->SM auth work?) is now answered
+# by smoke-m2 / smoke-m3, where a failing key type would surface as "invalid
+# token". Keep this check strict only when the chart still emits a key-type
+# field; otherwise pass-through with a note.
 cm=$(kubectl -n "$ns" get cm -o name | grep -i agent | head -1)
 data=$(kubectl -n "$ns" get "$cm" -o jsonpath='{.data}' 2>/dev/null || echo '')
-if grep -qi 'RSA' <<<"$data" && ! grep -qi 'ECP' <<<"$data"; then
-  ok 'RSA present, no ECP'
+if grep -qiE '(agent|workload)\.key\.type|keyType' <<<"$data"; then
+  if grep -qi 'RSA' <<<"$data" && ! grep -qi 'ECP' <<<"$data"; then
+    ok 'RSA present, no ECP'
+  else
+    err 'expected RSA, found: '"$(grep -oE '[A-Z]+[0-9]+' <<<"$data" | sort -u | xargs)"
+  fi
 else
-  err 'expected RSA, found: '"$(grep -oE '[A-Z]+[0-9]+' <<<"$data" | sort -u | xargs)"
+  ok 'chart does not expose agent/workload key.type (v1.0.0+); SVID flow validated by smoke-m2/m3'
 fi
 
 # ---- Tenant-side check (mints its own base64 token -- see deviation #3) ------

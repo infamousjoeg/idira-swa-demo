@@ -44,8 +44,12 @@ nodeAttestor:
     # That projected token has audience "swa-server" -- matches the audience
     # list set in TF (swa_server_group.node_attestation.k8s_psat.clusters.*.audience).
 
-# RSA override -- see header. The smoke test in scripts/smoke-m1.sh
-# verifies the rendered ConfigMap contains "RSA" and does NOT contain "ECP".
+# RSA override -- v1.0.4 only. The chart's templates/configmap.yaml in v1.0.0
+# no longer surfaces agent.key.type / workload.key.type (the agent binary
+# picks the default). These keys are retained here as a no-op so a future
+# downgrade to v1.0.4 doesn't silently re-introduce the EC default that SM JWT
+# rejects. smoke-m1 detects whether the chart still emits this field and only
+# enforces RSA when it does.
 agent:
   key:
     type: RSA2048
