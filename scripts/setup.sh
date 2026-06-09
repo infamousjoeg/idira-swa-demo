@@ -128,6 +128,8 @@ This script walks you through installing the demo's prerequisites and
 wiring up your local environment. It will:
   - Ask before installing any tool via Homebrew.
   - Build a .envrc from .envrc.example (no secrets).
+  - Verify the SWA release tarball (default `swa-release-v1.0.0.tgz`)
+    is present at the repo root. `make unpack` extracts it on demand.
   - Invoke `conceal set` so you can store your CyberArk Service User
     credentials in the macOS Keychain. Conceal prompts you for those
     directly; this script never sees them.
@@ -276,6 +278,19 @@ phase3_envrc() {
   ok ".envrc written (PANW_SM_TENANT=${tenant}, CONCEAL_NAMESPACE=${ns})"
   note '    If you use direnv, run `direnv allow` in another shell. I will'
   note '    re-exec myself so phase 5 sees the new env.'
+
+  # Warn-only: surface a missing release TGZ here so the user finds out
+  # before phase 6 (doctor). Default literal mirrors .envrc.example so
+  # this check works even on the first pass before re-exec sources .envrc.
+  local tgz="${SWA_RELEASE_TGZ:-swa-release-v1.0.0.tgz}"
+  if [[ ! -f "$tgz" ]]; then
+    miss "${tgz} not found at repo root"
+    note '    Download the SWA release tarball from CyberArk Marketplace'
+    note '    and drop it here. `make unpack` will extract it on demand.'
+    note '    Override the filename via SWA_RELEASE_TGZ in .envrc if needed.'
+  else
+    ok "${tgz} present"
+  fi
 }
 phase4_reexec() {
   (( SKIP_ENVRC )) && return 0
@@ -394,6 +409,7 @@ phase6_verify() {
   if (( rc == 0 )); then
     printf '\n%sAll set.%s Next steps:\n' "$C_GREEN" "$C_RESET"
     note '  source .envrc          # if direnv is not handling it'
+    note '  make unpack            # optional -- `make up-m1` triggers this'
     note '  make up-m1             # deploy SWA against your tenant'
   else
     printf '\n%sDoctor still flagged issues above.%s Address them, then re-run `make doctor`.\n' "$C_YELLOW" "$C_RESET"

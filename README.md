@@ -54,7 +54,7 @@ When you are done, `make down` tears the cluster and the tenant Terraform state 
 - macOS on Apple Silicon. The bundled SWA container images are `arm64v8`-only.
 - Docker (or OrbStack), `kind`, `kubectl`, `helm`, `terraform`, `jq`, `summon`, `conceal`, `direnv`, and Node 18+ on PATH.
 - Homebrew. `make setup` uses it to install anything missing above, with your consent at each step.
-- A `swa-release-1.0.4/` vendor bundle from Idira in the repo root (gitignored; obtain separately).
+- A `swa-release-v1.0.0.tgz` vendor tarball from Idira in the repo root (gitignored; obtain separately). `make unpack` extracts it on demand into `.swa-release/`; override the filename via `SWA_RELEASE_TGZ` in `.envrc` if you have a different release.
 - An Idira Secrets Manager - SaaS tenant and a Service User you can authenticate as.
 - An `.envrc` with `PANW_SM_TENANT` and `CONCEAL_NAMESPACE` set (created by `make setup`).
 
@@ -126,7 +126,8 @@ docs/                  images and reference companions for the README
 platform/              Helm values, Kubernetes manifests, Terraform sources
 scripts/               setup, doctor, deploy, and tenant-token helpers
 swa-docs/              mirrored upstream Idira SWA docs (read-only)
-swa-release-1.0.4/     vendor bundle from Idira (gitignored; obtain separately)
+swa-release-*.tgz      vendor tarball from Idira (gitignored; obtain separately)
+.swa-release/          unpacked release contents (gitignored; produced by `make unpack`)
 ui-tests/              Playwright headless smoke test driving the portal
 out/                   generated artifacts from make targets (gitignored)
 ```

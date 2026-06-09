@@ -4,7 +4,9 @@ This file is project guidance for anyone (human or otherwise) working in this re
 
 ## Repository nature
 
-This repo is a sandbox for working with the **Idira Secure Workload Access (SWA)** release distribution, not a source-code project. The tracked content is documentation and a Mac deploy guide; the actual release contents live under `swa-release-1.0.4/`, which is **gitignored**. Treat `swa-release-1.0.4/` as a vendor-provided artifact: read it, extract from it, run its scripts, but don't `git add` inside it without also intending to change `.gitignore`.
+This repo is a sandbox for working with the **Idira Secure Workload Access (SWA)** release distribution, not a source-code project. The tracked content is documentation, deploy scripts, and a Helm/Terraform overlay. The release itself ships as a single tarball (default `swa-release-v1.0.0.tgz`, override via `$SWA_RELEASE_TGZ` in `.envrc`) which the user drops into the repo root. Both the tarball glob (`swa-release-*.tgz`) and the extraction directory (`.swa-release/`) are **gitignored**. `make unpack` extracts the TGZ on demand into `.swa-release/`; it is idempotent (sha256-marker `.swa-release/.tgz-source`) and runs as a transitive prereq of every target that reads from the release.
+
+Treat `.swa-release/` as a vendor-provided artifact: read it, run its scripts, but don't `git add` inside it without also intending to change `.gitignore`.
 
 There is no application code to build, lint, or test here. The commands below are operational: loading container images, installing charts, installing a Terraform provider.
 
@@ -12,12 +14,17 @@ There is no application code to build, lint, or test here. The commands below ar
 
 A first-time user runs, in order:
 
+- Drop `swa-release-v1.0.0.tgz` (or whatever release tarball you obtained
+  from CyberArk Marketplace) into the repo root. Override the filename via
+  `SWA_RELEASE_TGZ` in `.envrc` if it differs.
 - `make setup` (interactive; six phases; installs missing tools via Homebrew
-  with consent, builds `.envrc` from `.envrc.example`, stores Service User
-  credentials in Keychain via `conceal set`, and as its final phase invokes
-  `make doctor` to verify the result).
+  with consent, builds `.envrc` from `.envrc.example`, warns if the TGZ is
+  not yet at the repo root, stores Service User credentials in Keychain via
+  `conceal set`, and as its final phase invokes `make doctor` to verify the
+  result).
 - `make up` (canonical deploy; M1 + M2 + M3 milestones; depends on
-  `make doctor` so it is also a safe trust-but-verify entry point).
+  `make doctor` so it is also a safe trust-but-verify entry point;
+  triggers `make unpack` transitively the first time).
 - `make portforward PORT=18080` (open the portal on a non-default port
   to avoid common 8080 collisions).
 
@@ -34,19 +41,19 @@ do I get there"; it does not touch the tenant or run any deploy step.
 
 ## What's in the release
 
-`swa-release-1.0.4/` is a self-contained Kubernetes deployment package for SWA, a SPIFFE-style workload identity / attestation system. Layout:
+`.swa-release/` (extracted from `swa-release-v1.0.0.tgz`) is a self-contained Kubernetes deployment package for SWA, a SPIFFE-style workload identity / attestation system. Layout:
 
-- `container-images/*.tar` -- pre-built `swa-server` and `swa-agent` images (amd64 + arm64v8) as `docker image load`-able tarballs, originally tagged `0.0.0-SNAPSHOT` with no repository prefix.
+- `container-images/*.tar` -- pre-built `swa-server` and `swa-agent` images (amd64 + arm64v8) as `docker image load`-able tarballs, tagged `<release>-<arch>` (for v1.0.0: `swa-server:1.0.0-arm64v8`, etc.; earlier `0.0.0-SNAPSHOT` builds are no longer shipped).
 - `helm/swa-server-0.1.0.tgz`, `helm/swa-agent-0.1.0.tgz` -- packaged Helm charts. Extract to read `values.yaml`.
 - `terraform-provider/` -- `cyberark/swa` Terraform provider binaries for darwin/linux/windows x amd64/arm64, plus `SHA256SUMS` + GPG `.sig`.
-- `binaries/` -- standalone `swa-agent` binaries (darwin/linux x amd64/arm64). No server binary; the agent is the only component meant to run outside Kubernetes.
+- `binaries/` -- standalone `swa-agent` binaries (darwin/linux x amd64/arm64). In v1.0.0 these live under per-arch subdirs (`binaries/swa-agent_1.0.0_<os>_<arch>/swa-agent`). No server binary; the agent is the only component meant to run outside Kubernetes.
 - `install-terraform-provider.sh` / `.ps1` -- install the provider into `~/.terraform.d/plugins/registry.terraform.io/cyberark/swa/<version>/<os>_<arch>/`.
 - `Makefile` -- image push/load targets (default goal is `help`).
-- `manifest.txt` -- pins the upstream component versions (`swa-services`, `swa-customer-components`) for this release.
+- `manifest.txt` -- pins the upstream component versions (`release`, `swa-services`, `swa-customer-components`). `scripts/derive-image-tag.sh` reads `release:` to compute the image tag at Helm-install time.
 
 ## Common operations
 
-All commands run from `swa-release-1.0.4/`.
+All commands run from `.swa-release/` (extracted on demand by `make unpack`).
 
 **Push images to a registry** -- auto-loads each tar via `docker image load`, parses the loaded tag, retags to `$REGISTRY/<image>`, pushes:
 
@@ -73,7 +80,7 @@ make kind-load-images KIND_CLUSTER=<name>
 helm install swa-server ./helm/swa-server/ \
   --namespace swa-system --create-namespace \
   --set controlPlane.url=<...> \
-  --set controlPlane.auth.loginURL=<...> \
+  --set controlPlane.auth.authnID=<...> \    # v1.0.4 chart: loginURL=<...>
   --set rbac.createTokenReviewRole=true
 
 helm install swa-agent ./helm/swa-agent/ \
@@ -83,10 +90,10 @@ helm install swa-agent ./helm/swa-agent/ \
   --set nodeAttestor.k8s_psat.cluster=<cluster-name>
 ```
 
-The charts are shipped as `.tgz`. To read defaults:
+The charts are shipped as `.tgz`. To read defaults (after `make unpack`):
 
 ```bash
-tar xzf helm/swa-server-0.1.0.tgz -C /tmp/ && cat /tmp/swa-server/values.yaml
+tar xzf .swa-release/helm/swa-server-0.1.0.tgz -C /tmp/ && cat /tmp/swa-server/values.yaml
 ```
 
 ## Component architecture
@@ -103,7 +110,7 @@ SWA splits into three layers. **You can't do a real end-to-end deploy with the b
 trust domain (e.g., mac.local)
   └── server group (one or more, scoped to a node attestor: k8s_psat or x509pop)
         └── node group (defines which workloads can get SVIDs; carries the swa_nodegroup label)
-              └── server (registration creates an authn_id you pass to the chart as controlPlane.auth.loginURL)
+              └── server (registration creates an authn_id you pass to the chart as controlPlane.auth.authnID; v1.0.4 chart called this controlPlane.auth.loginURL)
 ```
 
 **Node attestation** uses one of:

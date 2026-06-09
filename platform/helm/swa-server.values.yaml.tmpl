@@ -2,10 +2,10 @@
 # platform/helm/swa-server.values.yaml. The rendered file is gitignored.
 #
 # Env vars consumed (set by the Makefile's install-server target):
-#   PANW_SM_URL    -- https://<tenant>.secretsmgr.cyberark.cloud
-#   SWA_LOGIN_URL  -- tf output `login_url` (the bundled provider's
-#                    computed attribute name for the server registration
-#                    URL the agent uses to authenticate).
+#   PANW_SM_URL   -- https://<tenant>.secretsmgr.cyberark.cloud
+#   SWA_AUTHN_ID  -- tf output `authn_id` (the v1.0.0 provider's
+#                   computed attribute name for the server's SM authentication
+#                   ID; renamed from `login_url` in v1.0.4).
 #
 # Critical: the bundled chart has NO `trustDomain.name` key on the SERVER
 # side. The trust-domain identity lives on the control plane (TF) and on
@@ -14,14 +14,17 @@
 
 image:
   repository: swa-server
-  tag: 0.0.0-SNAPSHOT-arm64v8     # Apple-Silicon only (see scripts/doctor.sh)
+  # Apple-Silicon only (see scripts/doctor.sh). Rendered at install time from
+  # .swa-release/manifest.txt by scripts/derive-image-tag.sh; override via
+  # $SWA_IMAGE_TAG in .envrc to pin a non-default tag.
+  tag: ${SWA_IMAGE_TAG}
   pullPolicy: IfNotPresent         # kind has the image preloaded -- never pull
 
 controlPlane:
   url: ${PANW_SM_URL}              # e.g. https://<your-subdomain>.secretsmgr.cyberark.cloud
   auth:
     type: jwt                      # chart default; pinned to match SM JWT authn
-    loginURL: ${SWA_LOGIN_URL}     # full Conjur authenticate URL (base64-encoded)
+    authnID: ${SWA_AUTHN_ID}       # SM authentication ID (renamed from loginURL in chart v1.0.0)
     audience: conjur               # MUST match swa_server.auth.audience in TF
                                    # AND the audience asserted by the projected
                                    # SA token (chart sets this on the volume).

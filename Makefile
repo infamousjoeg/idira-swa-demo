@@ -9,9 +9,12 @@ SHELL := bash
 #
 # Secrets are NOT in env. Credentials live in macOS Keychain via Conceal and
 # are injected into tenant-touching commands via $(SUMMON) (see below).
-KIND_CLUSTER ?= swa
-PANW_SM_URL  := https://$(PANW_SM_TENANT).secretsmgr.cyberark.cloud
-TF           := terraform -chdir=platform/terraform
+KIND_CLUSTER    ?= swa
+PANW_SM_URL     := https://$(PANW_SM_TENANT).secretsmgr.cyberark.cloud
+TF              := terraform -chdir=platform/terraform
+# SWA release is shipped as a TGZ; `make unpack` extracts it here on demand.
+# The tarball filename is configurable via .envrc ($SWA_RELEASE_TGZ).
+SWA_RELEASE_DIR := .swa-release
 
 # SUMMON wraps a command, injecting CLIENT_ID + CLIENT_SECRET into its env from
 # Conceal-backed macOS Keychain. Provider flag is `conceal_summon` (not
@@ -23,7 +26,7 @@ SUMMON = summon -p conceal_summon --yaml "$$(printf 'CLIENT_ID: !var %s/client_i
 .DEFAULT_GOAL := help
 .PHONY: help setup doctor tf-token down install-tf-provider cluster images \
         tf-init tf-apply-platform install-server install-agent smoke-m1 \
-        up-m1 _check-env
+        up-m1 _check-env unpack migrate-from-1.0.4
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z0-9_-]+:.*##/{printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -34,6 +37,22 @@ setup: ## First-time guided onboarding (installs tools, builds .envrc, stores se
 doctor: ## Verify prerequisites
 	@./scripts/doctor.sh
 
+unpack: ## Extract the SWA release TGZ into $(SWA_RELEASE_DIR) (idempotent)
+	@./scripts/unpack-release.sh
+
+migrate-from-1.0.4: ## Detect a stale swa-release-1.0.4/ folder and print cleanup hint
+	@if [[ -d swa-release-1.0.4 ]]; then \
+	  echo "Found legacy swa-release-1.0.4/ directory. This repo now extracts"; \
+	  echo "the release TGZ into $(SWA_RELEASE_DIR)/ instead. Run:"; \
+	  echo; \
+	  echo "    rm -rf swa-release-1.0.4"; \
+	  echo; \
+	  echo "(safe -- the contents are vendor-provided and reproducible from"; \
+	  echo " the TGZ via 'make unpack')."; \
+	else \
+	  echo "No legacy swa-release-1.0.4/ folder found. Nothing to do."; \
+	fi
+
 _check-env:
 	@: "$${PANW_SM_TENANT:?set in .envrc (see .envrc.example)}"
 	@: "$${CONCEAL_NAMESPACE:?set in .envrc (see .envrc.example) -- Keychain namespace holding client_id+client_secret}"
@@ -42,15 +61,15 @@ tf-token: _check-env ## Print env exports to source for manual `terraform` use
 	@echo "export CONJUR_APPLIANCE_URL=$(PANW_SM_URL)"
 	@printf 'export CONJUR_AUTHN_TOKEN=%s\n' "$$($(SUMMON) -- ./scripts/get-sm-token.sh)"
 
-install-tf-provider: ## Install cyberark/swa terraform provider from the bundle
-	cd swa-release-1.0.4 && ./install-terraform-provider.sh
+install-tf-provider: unpack ## Install cyberark/swa terraform provider from the bundle
+	cd $(SWA_RELEASE_DIR) && ./install-terraform-provider.sh
 	@# Defang macOS Gatekeeper quarantine if present (see DEPLOY_MACOS.md).
 	-xattr -d com.apple.quarantine \
 	  ~/.terraform.d/plugins/registry.terraform.io/cyberark/swa/*/darwin_arm64/terraform-provider-swa_* \
 	  2>/dev/null || true
 
-images: ## Load bundled SWA images + busybox (init containers) into kind
-	$(MAKE) -C swa-release-1.0.4 kind-load-images KIND_CLUSTER=$(KIND_CLUSTER)
+images: unpack ## Load bundled SWA images + busybox (init containers) into kind
+	$(MAKE) -C $(SWA_RELEASE_DIR) kind-load-images KIND_CLUSTER=$(KIND_CLUSTER)
 	@# Both chart's init containers use busybox:latest with imagePullPolicy:
 	@# IfNotPresent. On a laptop where the kubelet inherits HTTP_PROXY from
 	@# the host (Docker Desktop common case), the proxy at 127.0.0.1:8080 is
@@ -82,22 +101,24 @@ tf-apply-platform: _check-env tf-init ## Apply TF subset #1: SPIFFE hierarchy + 
 	      -target=swa_server_group.kind_sg \
 	      -target=swa_node_group.kind_ng \
 	      -target=swa_server.kind'
-	@$(TF) output -json | jq -r '"login_url = " + .login_url.value'
+	@$(TF) output -json | jq -r '"authn_id = " + .authn_id.value'
 
-install-server: tf-apply-platform ## Render values and install/upgrade swa-server (waits for ready)
+install-server: unpack tf-apply-platform ## Render values and install/upgrade swa-server (waits for ready)
 	@PANW_SM_URL=$(PANW_SM_URL) \
-	  SWA_LOGIN_URL=$$($(TF) output -raw login_url) \
+	  SWA_AUTHN_ID=$$($(TF) output -raw authn_id) \
+	  SWA_IMAGE_TAG=$$(./scripts/derive-image-tag.sh) \
 	  envsubst < platform/helm/swa-server.values.yaml.tmpl \
 	  > platform/helm/swa-server.values.yaml
-	helm upgrade --install swa-server swa-release-1.0.4/helm/swa-server-0.1.0.tgz \
+	helm upgrade --install swa-server $(SWA_RELEASE_DIR)/helm/swa-server-0.1.0.tgz \
 	  --namespace swa-system --create-namespace \
 	  -f platform/helm/swa-server.values.yaml \
 	  --wait --timeout 3m
 
-install-agent: install-server ## Install/upgrade swa-agent (depends on server being up)
-	@envsubst < platform/helm/swa-agent.values.yaml.tmpl \
+install-agent: unpack install-server ## Install/upgrade swa-agent (depends on server being up)
+	@SWA_IMAGE_TAG=$$(./scripts/derive-image-tag.sh) \
+	  envsubst < platform/helm/swa-agent.values.yaml.tmpl \
 	  > platform/helm/swa-agent.values.yaml
-	helm upgrade --install swa-agent swa-release-1.0.4/helm/swa-agent-0.1.0.tgz \
+	helm upgrade --install swa-agent $(SWA_RELEASE_DIR)/helm/swa-agent-0.1.0.tgz \
 	  --namespace swa-system \
 	  -f platform/helm/swa-agent.values.yaml \
 	  --wait --timeout 3m
