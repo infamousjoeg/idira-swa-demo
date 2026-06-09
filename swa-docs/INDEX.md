@@ -32,6 +32,6 @@ If you've never touched SWA before, read in this order:
 
 It covers everything reachable in one hop from the SWA landing page. It does **not** include the API reference (`apis/ccl-api-swa-*.htm`) or the external-platform federation pages -- links to those are preserved as absolute URLs in the converted markdown.
 
-For Mac-specific deployment instructions that tie this docs content to the bundled `swa-release-1.0.4/` artifacts, see [`../DEPLOY_MACOS.md`](../DEPLOY_MACOS.md).
+For Mac-specific deployment instructions that tie this docs content to the bundled SWA release tarball (default `swa-release-v1.0.0.tgz`, extracted into `.swa-release/` by `make unpack`), see [`../docs/under-the-hood.md`](../docs/under-the-hood.md).
 
 Note: pages under `swa-docs/pages/` are faithful mirrors of the upstream MadCap Flare source and preserve original typography (including em-dashes and en-dashes) for fidelity. Refetches via the markitdown pipeline will re-introduce these characters. The no-em-dash convention used elsewhere in this repo (READMEs, code comments, locally-authored docs) does not apply here.

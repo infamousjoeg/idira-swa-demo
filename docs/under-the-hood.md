@@ -22,9 +22,9 @@ This guide is written for, and was sanity-checked against, the following on this
 | kubectl | v1.34.1 |
 | Helm | v3.19.0 |
 | Terraform | v1.5.7 |
-| Bundle | `swa-release-1.0.4/` (manifest: `swa-services main/758-0d54f57b`, `swa-customer-components main/71-e0de5733`) |
+| Bundle | `swa-release-v1.0.0.tgz` at the repo root, extracted into `.swa-release/` by `make unpack` (manifest: `release: v1.0.0`, `swa-services main/821-c2081762`, `swa-customer-components v1.0.0`). Override the tarball filename via `SWA_RELEASE_TGZ` in `.envrc` if you have a different release. |
 
-The bundle ships images for **both** `amd64` and `arm64v8`. On Apple Silicon you only need the `arm64v8` variants -- `swa-agent:0.0.0-SNAPSHOT-arm64v8` and `swa-server:0.0.0-SNAPSHOT-arm64v8`.
+The bundle ships images for **both** `amd64` and `arm64v8`. On Apple Silicon you only need the `arm64v8` variants -- for v1.0.0: `swa-agent:1.0.0-arm64v8` and `swa-server:1.0.0-arm64v8`. The exact tag is derived at Helm-install time from `.swa-release/manifest.txt` by `scripts/derive-image-tag.sh`, so you don't normally type it by hand.
 
 ## 1. Prerequisites
 
@@ -60,7 +60,8 @@ Use this to verify that the bundle, charts, and Terraform provider are all sound
 (equivalent to: `make cluster`)
 
 ```bash
-cd swa-release-1.0.4
+make unpack          # extracts swa-release-v1.0.0.tgz into .swa-release/
+cd .swa-release
 kind create cluster --name swa --image kindest/node:v1.34.0
 kubectl cluster-info --context kind-swa
 ```
@@ -79,8 +80,8 @@ Both architectures load; only `arm64v8` will actually run on Apple Silicon. Afte
 
 ```bash
 docker exec swa-control-plane crictl images | grep swa
-# expect: docker.io/library/swa-agent:0.0.0-SNAPSHOT-arm64v8
-#         docker.io/library/swa-server:0.0.0-SNAPSHOT-arm64v8
+# expect: docker.io/library/swa-agent:1.0.0-arm64v8
+#         docker.io/library/swa-server:1.0.0-arm64v8
 ```
 
 ### 2.3 Install the SWA Server chart (sandbox)
@@ -91,7 +92,7 @@ The chart is packaged as `helm/swa-server-0.1.0.tgz`; `helm install` accepts the
 helm install swa-server ./helm/swa-server-0.1.0.tgz \
   --namespace swa-system --create-namespace \
   --set image.repository=swa-server \
-  --set image.tag=0.0.0-SNAPSHOT-arm64v8 \
+  --set image.tag=1.0.0-arm64v8 \
   --set image.pullPolicy=IfNotPresent \
   --set controlPlane.url=https://sandbox.example.invalid \
   --set controlPlane.auth.loginURL=sandbox-authn \
@@ -111,7 +112,7 @@ Pod scheduling and image pull should succeed. The container's auth loop will fai
 helm install swa-agent ./helm/swa-agent-0.1.0.tgz \
   --namespace swa-system \
   --set image.repository=swa-agent \
-  --set image.tag=0.0.0-SNAPSHOT-arm64v8 \
+  --set image.tag=1.0.0-arm64v8 \
   --set image.pullPolicy=IfNotPresent \
   --set trustDomain.name=sandbox.local \
   --set server.address=swa-server.swa-system.svc.cluster.local:8443 \
@@ -217,7 +218,7 @@ curl -sS -X POST "${SWA_API_BASE}/api/swa/trust-domains/${TRUST_DOMAIN_NAME}/ser
 
 ```bash
 kind create cluster --name swa --image kindest/node:v1.34.0
-cd swa-release-1.0.4 && make kind-load-images KIND_CLUSTER=swa
+make unpack && cd .swa-release && make kind-load-images KIND_CLUSTER=swa
 kubectl get --raw '/.well-known/openid-configuration' | jq .
 ```
 
@@ -265,7 +266,7 @@ export AUTHN_ID="<authn_id from above>"
 helm install swa-server ./helm/swa-server-0.1.0.tgz \
   --namespace swa-system --create-namespace \
   --set image.repository=swa-server \
-  --set image.tag=0.0.0-SNAPSHOT-arm64v8 \
+  --set image.tag=1.0.0-arm64v8 \
   --set image.pullPolicy=IfNotPresent \
   --set controlPlane.url="${SWA_API_BASE}" \
   --set controlPlane.auth.loginURL="${AUTHN_ID}" \
@@ -290,7 +291,7 @@ A healthy server logs successful authentication against the control plane and ex
 helm install swa-agent ./helm/swa-agent-0.1.0.tgz \
   --namespace swa-system \
   --set image.repository=swa-agent \
-  --set image.tag=0.0.0-SNAPSHOT-arm64v8 \
+  --set image.tag=1.0.0-arm64v8 \
   --set image.pullPolicy=IfNotPresent \
   --set trustDomain.name="${TRUST_DOMAIN_NAME}" \
   --set server.address=swa-server.swa-system.svc.cluster.local:8443 \
@@ -410,8 +411,8 @@ curl -sS -X DELETE "${SWA_API_BASE}/api/swa/trust-domains/${TRUST_DOMAIN_NAME}/s
 
 ## 7. Mac-specific gotchas
 
-- **Arch:** Apple Silicon must use `*-arm64v8` images. If you accidentally pin `image.tag=0.0.0-SNAPSHOT-amd64`, pods loop with `exec format error` after Docker emulation gives up.
+- **Arch:** Apple Silicon must use `*-arm64v8` images. If you accidentally pin `image.tag=1.0.0-amd64`, pods loop with `exec format error` after Docker emulation gives up.
 - **Docker Desktop vs. OrbStack:** Both work with kind; OrbStack uses less RAM. If you switch, recreate the cluster (kind state is per-Docker-runtime).
 - **`hostNetwork: true` on kind:** The agent chart uses `hostNetwork` so it can reach the kubelet API. On kind that "host" is the kind-node container, not your Mac -- this is fine and is what the chart expects.
 - **Tenant reachability:** Your kind cluster cannot expose anything to your tenant. Always use `public_keys` for SWA Server registration on a laptop (§3.3), never `jwks_uri`.
-- **SNAPSHOT builds:** The `0.0.0-SNAPSHOT` images in this bundle are pre-release. Don't rely on them for compatibility guarantees; they're for local validation of the install path.
+- **Release tarball + image tag:** `make unpack` extracts `swa-release-v1.0.0.tgz` (default) into `.swa-release/`. The Helm install pulls the image tag from `.swa-release/manifest.txt` via `scripts/derive-image-tag.sh`, so bumping releases is "drop the new TGZ and update `SWA_RELEASE_TGZ` in `.envrc`" -- no code edits.

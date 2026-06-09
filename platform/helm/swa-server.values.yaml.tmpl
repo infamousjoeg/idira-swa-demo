@@ -14,7 +14,10 @@
 
 image:
   repository: swa-server
-  tag: 0.0.0-SNAPSHOT-arm64v8     # Apple-Silicon only (see scripts/doctor.sh)
+  # Apple-Silicon only (see scripts/doctor.sh). Rendered at install time from
+  # .swa-release/manifest.txt by scripts/derive-image-tag.sh; override via
+  # $SWA_IMAGE_TAG in .envrc to pin a non-default tag.
+  tag: ${SWA_IMAGE_TAG}
   pullPolicy: IfNotPresent         # kind has the image preloaded -- never pull
 
 controlPlane:

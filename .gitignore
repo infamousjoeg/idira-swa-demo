@@ -1,4 +1,5 @@
-swa-release-1.0.4/
+.swa-release/
+swa-release-*.tgz
 .playwright-mcp/
 .DS_Store
 

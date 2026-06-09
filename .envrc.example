@@ -27,3 +27,15 @@ export CONCEAL_NAMESPACE=<your-keychain-namespace>
 # Override if your Terraform module uses different names.
 export IDIRA_SERVER_GROUP=kind-sg
 export IDIRA_ATTESTOR=k8s_psat
+
+# === SWA release bundle ===
+# Filename of the SWA release tarball you dropped at the repo root.
+# `make unpack` (called transitively by `make up`) extracts this into
+# .swa-release/ on demand. Bump this when CyberArk ships a new release;
+# no code edits required.
+export SWA_RELEASE_TGZ=swa-release-v1.0.0.tgz
+
+# Container image tag rendered into the Helm values templates. Leave empty
+# to auto-derive from .swa-release/manifest.txt as <release>-arm64v8 (the
+# common case). Set explicitly only when you want to pin a non-default tag.
+export SWA_IMAGE_TAG=

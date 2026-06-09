@@ -52,12 +52,40 @@ echo 'Host:'
 check_arch
 
 echo
-echo 'Bundle:'
-check_path 'swa-release-1.0.4'                                          'vendor drop must be in repo root'
-check_path 'swa-release-1.0.4/container-images'                         'image tarballs'
-check_path 'swa-release-1.0.4/helm/swa-server-0.1.0.tgz'                'server chart'
-check_path 'swa-release-1.0.4/helm/swa-agent-0.1.0.tgz'                 'agent chart'
-check_path 'swa-release-1.0.4/install-terraform-provider.sh'            'provider installer'
+echo 'Release bundle:'
+# Resolve the TGZ filename via env (override-friendly) with the canonical
+# default. This intentionally does NOT participate in the env-var loop below
+# -- the loop fails on empty values, and this variable is legitimately
+# defaultable.
+tgz="${SWA_RELEASE_TGZ:-swa-release-v1.0.0.tgz}"
+if [[ ! -f "$tgz" ]]; then
+  printf '  [MISSING] %-30s -- drop the SWA release tarball at repo root\n' "$tgz"
+  fail=$((fail+1))
+else
+  printf '  [ok]      %-30s\n' "$tgz"
+  # Verify .swa-release/ is in lockstep with the source TGZ via the marker
+  # file written by scripts/unpack-release.sh.
+  mark='.swa-release/.tgz-source'
+  want_sha=$(shasum -a 256 "$tgz" | awk '{print $1}')
+  want="tgz=$(basename "$tgz")"$'\n'"sha256=$want_sha"
+  if [[ ! -f "$mark" ]]; then
+    printf '  [MISSING] %-30s -- run `make unpack`\n' '.swa-release/ (unpacked)'
+    fail=$((fail+1))
+  elif [[ "$(cat "$mark")" != "$want" ]]; then
+    printf '  [STALE]   %-30s -- TGZ changed; run `make unpack`\n' '.swa-release/'
+    fail=$((fail+1))
+  else
+    printf '  [ok]      %-30s\n' '.swa-release/ (matches TGZ)'
+    check_path '.swa-release/container-images'                  'image tarballs'
+    check_path '.swa-release/helm/swa-server-0.1.0.tgz'         'server chart'
+    check_path '.swa-release/helm/swa-agent-0.1.0.tgz'          'agent chart'
+    check_path '.swa-release/install-terraform-provider.sh'     'provider installer'
+  fi
+fi
+# Friendly warning if a legacy 1.0.4 folder is still hanging around.
+if [[ -d swa-release-1.0.4 ]]; then
+  printf '  [warn]    legacy swa-release-1.0.4/ folder present -- run `make migrate-from-1.0.4`\n'
+fi
 
 echo
 echo 'Non-secret env:'

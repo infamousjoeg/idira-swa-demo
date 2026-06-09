@@ -14,7 +14,9 @@
 
 image:
   repository: swa-agent
-  tag: 0.0.0-SNAPSHOT-arm64v8        # Apple-Silicon only
+  # Apple-Silicon only. Rendered at install time from .swa-release/manifest.txt
+  # by scripts/derive-image-tag.sh; override via $SWA_IMAGE_TAG in .envrc.
+  tag: ${SWA_IMAGE_TAG}
   pullPolicy: IfNotPresent             # kind has the image preloaded -- never pull
 
 trustDomain:
