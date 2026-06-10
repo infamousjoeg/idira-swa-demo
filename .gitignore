@@ -26,6 +26,10 @@ apps/carrier/carrier
 apps/portal/portal
 apps/acme-carrier/acme-carrier
 
+# Portal UI (React/Vite) build toolchain
+apps/portal/ui-src/node_modules/
+apps/portal/ui-src/.vite/
+
 # UI test artifacts
 ui-tests/node_modules/
 ui-tests/test-results/

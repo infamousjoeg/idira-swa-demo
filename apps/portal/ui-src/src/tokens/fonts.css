@@ -1,0 +1,81 @@
+/* ============================================================
+   Idira Design System -- Web Fonts
+   ------------------------------------------------------------
+   BRAND FONTS (print / licensed, NOT embeddable here):
+     . TT Hoves          -- primary display & UI typeface
+     . FF Celeste        -- serif, used sparingly for contrast
+     . Ringside Wide     -- GTM / product-logo signatures only
+   WEB-SAFE BRAND FONT (per PAN guidelines):
+     . Helvetica Neue    -- "For texts that need to be compatible
+                            with HTML language, the Helvetica Neue
+                            font and its variations will be used."
+   ------------------------------------------------------------
+   Self-hosted TT Hoves Pro (trial) replaces the Hanken Grotesk
+   stand-in from the design system handoff. IBM Plex Mono is
+   self-hosted from the OFL-licensed GitHub release.
+   Source: https://dl.dafont.com/dl/?f=tt_hoves_pro (trial)
+   License: production license is a separate procurement step.
+   ============================================================ */
+
+/* TT Hoves Pro -- Regular 400 */
+@font-face {
+  font-family: "TT Hoves Pro";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/tt-hoves/tt-hoves-pro-regular.woff2") format("woff2");
+}
+
+/* TT Hoves Pro -- Italic 400 */
+@font-face {
+  font-family: "TT Hoves Pro";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/tt-hoves/tt-hoves-pro-italic.woff2") format("woff2");
+}
+
+/* TT Hoves Pro -- Medium 500 */
+@font-face {
+  font-family: "TT Hoves Pro";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/tt-hoves/tt-hoves-pro-medium.woff2") format("woff2");
+}
+
+/* TT Hoves Pro -- DemiBold 600 */
+@font-face {
+  font-family: "TT Hoves Pro";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/tt-hoves/tt-hoves-pro-demibold.woff2") format("woff2");
+}
+
+/* TT Hoves Pro -- Bold 700 */
+@font-face {
+  font-family: "TT Hoves Pro";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/tt-hoves/tt-hoves-pro-bold.woff2") format("woff2");
+}
+
+/* IBM Plex Mono -- Regular 400 */
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/plex-mono/IBMPlexMono-Regular.woff2") format("woff2");
+}
+
+/* IBM Plex Mono -- Medium 500 */
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/plex-mono/IBMPlexMono-Medium.woff2") format("woff2");
+}

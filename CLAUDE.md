@@ -51,6 +51,24 @@ do I get there"; it does not touch the tenant or run any deploy step.
 - `Makefile` -- image push/load targets (default goal is `help`).
 - `manifest.txt` -- pins the upstream component versions (`release`, `swa-services`, `swa-customer-components`). `scripts/derive-image-tag.sh` reads `release:` to compute the image tag at Helm-install time.
 
+## Portal UI build
+
+The portal UI is a React/Vite/TypeScript app under `apps/portal/ui-src/`. The build output goes to `apps/portal/ui/` (overwriting the previous vanilla JS contents), where the Go portal's `//go:embed all:ui` directive picks it up.
+
+**Prerequisites:** Node 22 LTS, pnpm 9.
+
+**Build commands:**
+
+```bash
+# Build just the UI (also runs as a prereq of build-apps):
+make build-ui
+
+# Or manually:
+cd apps/portal/ui-src && pnpm install --frozen-lockfile && pnpm run build
+```
+
+The Dockerfile includes a Node build stage, so `docker build` does not require a local Node install. `make build-apps` invokes `make build-ui` before the Docker builds.
+
 ## Common operations
 
 All commands run from `.swa-release/` (extracted on demand by `make unpack`).
