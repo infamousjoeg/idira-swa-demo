@@ -73,6 +73,10 @@ export function useResolveEngine(): ResolveEngine {
   const [error, setError] = useState<ResolveError | null>(null);
   // Track the highest completed stage so we never go backward.
   const maxStage = useRef(-1);
+  // Capture the foreign peer URI from mtls.peer_uri_seen so we can merge
+  // it into the error payload when mtls.handshake.err arrives (the backend
+  // emits these as two separate SSE events).
+  const peerUri = useRef<string | null>(null);
 
   // Open the SSE connection once.
   useEffect(() => {
@@ -86,14 +90,27 @@ export function useResolveEngine(): ResolveEngine {
     const unsub = paceQueue.subscribe((ev: PaceEvent) => {
       const idx = eventToStage(ev.type);
 
+      // Capture the foreign peer URI from mtls.peer_uri_seen. The backend
+      // emits this as a separate event before mtls.handshake.err.
+      if (ev.type === "mtls.peer_uri_seen" && ev.payload) {
+        peerUri.current = (ev.payload as Record<string, unknown>).uri as string ?? null;
+      }
+
       // Error SSE events (e.g. mtls.handshake.err) set error status.
       // These are authoritative for the error path since the Go handler
-      // may have already returned 502 by this point.
+      // may have already returned 502 by this point. Merge the captured
+      // peer URI from mtls.peer_uri_seen into the error payload.
       if (isErrorEvent(ev.type)) {
+        const merged: Record<string, unknown> = {
+          ...(ev.payload as Record<string, unknown> | undefined),
+        };
+        if (peerUri.current) {
+          merged.uri = peerUri.current;
+        }
         setError({
           type: ev.type,
-          message: ev.payload?.err as string | undefined,
-          payload: ev.payload as Record<string, unknown> | undefined,
+          message: merged.err as string | undefined,
+          payload: merged,
         });
         setStage(-1);
         maxStage.current = -1;
@@ -147,6 +164,7 @@ export function useResolveEngine(): ResolveEngine {
     setResult(null);
     setError(null);
     maxStage.current = -1;
+    peerUri.current = null;
     ttlTicker.freeze();
 
     // POST /resolve. The HTTP response carries the manifest data (done)
@@ -168,11 +186,13 @@ export function useResolveEngine(): ResolveEngine {
           // Non-OK HTTP means the carrier call failed. For external carrier
           // this is 502 (trust boundary rejection). The SSE error event
           // (mtls.handshake.err) may arrive before or after this -- either
-          // path sets status to error.
+          // path sets status to error. Use a functional update so we don't
+          // clobber a richer SSE-sourced error that already carries payload
+          // (e.g. the foreign carrier's SPIFFE URI).
           const text = await resp.text().catch(() => "");
-          setError({
-            type: "http.error",
-            message: text || `${resp.status}`,
+          setError((prev) => {
+            if (prev?.payload) return prev;
+            return { type: "http.error", message: text || `${resp.status}` };
           });
           setStatus("error");
         }
@@ -193,6 +213,7 @@ export function useResolveEngine(): ResolveEngine {
     setResult(null);
     setError(null);
     maxStage.current = -1;
+    peerUri.current = null;
   }, []);
 
   return {

@@ -307,9 +307,9 @@ export function PortalPane({
                   ? error.message
                   : "The external carrier could not be authenticated. No secret was issued, so the shipment manifest cannot be returned."}
               </p>
-              {error?.payload?.foreign_uri != null && (
+              {error?.payload?.uri != null && (
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)", wordBreak: "break-all" as const }}>
-                  {String(error.payload.foreign_uri)}
+                  {String(error.payload.uri)}
                 </div>
               )}
               <Evidence kind="error" />
