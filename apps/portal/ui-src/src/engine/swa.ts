@@ -26,6 +26,27 @@ export const SWA = {
     weight: "18,400 kg",
     mode: "Ocean - FCL",
     container: "PRLU-774203-1",
+    // Container detail micro-line under the Container manifest row.
+    containerDetail: "40' HC - Maersk Line - Seal MAEU-8830124",
+    // Recent activity log, static demo content. Render order is top-to-bottom
+    // chronological (newest first). Timestamps in mono.
+    events: [
+      {
+        ts: "Jun 11 06:12 UTC",
+        text: "Vessel position update",
+        place: "East China Sea, 28.4N 124.1E",
+      },
+      {
+        ts: "Jun 6 14:30 UTC",
+        text: "Loaded on vessel",
+        place: "Singapore PSA Terminal 4",
+      },
+      {
+        ts: "Jun 5 08:05 UTC",
+        text: "Gate-in at port",
+        place: "Singapore PSA Terminal 4",
+      },
+    ],
   },
 
   // The six animated stages of a successful resolve.

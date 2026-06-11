@@ -16,6 +16,9 @@ import { PraetorMark } from "./PraetorMark";
 import { Segmented } from "./Segmented";
 import { RouteStrip } from "./RouteStrip";
 import { Evidence } from "./Evidence";
+import { VoyageProgress } from "./VoyageProgress";
+import { RecentEvents } from "./RecentEvents";
+import { SWA } from "../engine/swa";
 import type { EngineStatus, ResolveResult, ResolveError } from "../engine/useResolveEngine";
 
 /** "2026-06-09T14:00:00Z" -> "Jun 9, 14:00 UTC" */
@@ -156,8 +159,20 @@ const ps = {
     padding: "11px 0",
     borderBottom: "1px solid var(--border-subtle)",
   },
+  mfRowStack: {
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "flex-end" as const,
+    gap: 2,
+  },
   mfKey: { fontSize: 12.5, color: "var(--text-muted)", letterSpacing: "0.01em" },
   mfVal: { fontSize: 14, fontWeight: 600, color: "var(--text-body)" },
+  mfSub: {
+    fontSize: 11.5,
+    color: "var(--text-subtle)",
+    fontFamily: "var(--font-mono)",
+    letterSpacing: "0.01em",
+  },
   errAccent: {
     borderLeft: "3px solid var(--status-danger)",
     paddingLeft: 12,
@@ -184,17 +199,30 @@ const ps = {
   },
 };
 
-function ManifestRow({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
+function ManifestRow({
+  k,
+  v,
+  mono,
+  sub,
+}: {
+  k: string;
+  v: string;
+  mono?: boolean;
+  sub?: string;
+}) {
   return (
     <div style={ps.mfRow}>
       <span style={ps.mfKey}>{k}</span>
-      <span
-        style={{
-          ...ps.mfVal,
-          fontFamily: mono ? "var(--font-mono)" : "var(--font-sans)",
-        }}
-      >
-        {v}
+      <span style={ps.mfRowStack}>
+        <span
+          style={{
+            ...ps.mfVal,
+            fontFamily: mono ? "var(--font-mono)" : "var(--font-sans)",
+          }}
+        >
+          {v}
+        </span>
+        {sub && <span style={ps.mfSub}>{sub}</span>}
       </span>
     </div>
   );
@@ -311,6 +339,7 @@ export function PortalPane({
                   In transit
                 </Badge>
               </div>
+              <VoyageProgress current="transit" />
               <RouteStrip
                 origin={r.origin ?? ""}
                 dest={r.destination ?? ""}
@@ -319,10 +348,18 @@ export function PortalPane({
               <div style={ps.manifest}>
                 {r.carrier_name && <ManifestRow k="Carrier" v={r.carrier_name} />}
                 {r.mode && <ManifestRow k="Mode" v={r.mode} />}
-                {r.container && <ManifestRow k="Container" v={r.container} mono />}
+                {r.container && (
+                  <ManifestRow
+                    k="Container"
+                    v={r.container}
+                    mono
+                    sub={SWA.shipment.containerDetail}
+                  />
+                )}
                 {r.weight && <ManifestRow k="Gross weight" v={r.weight} />}
                 {r.eta && <ManifestRow k="ETA" v={formatEtaShort(r.eta)} />}
               </div>
+              <RecentEvents events={SWA.shipment.events} />
               <Evidence kind="success" />
             </div>
           )}
