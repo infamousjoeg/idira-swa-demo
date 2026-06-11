@@ -30,6 +30,8 @@ export interface InspectorProps {
   completed: number;
   carrier: "internal" | "external";
   jwtTtl: number;
+  /** Real peer SPIFFE URI captured from mtls.peer_uri_seen on the external path. */
+  foreignPeerUri?: string;
 }
 
 // Thin meter bar -- progress visualization used by Topology and Layers.

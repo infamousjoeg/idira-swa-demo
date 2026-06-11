@@ -5,7 +5,7 @@
 
 > A Mac laptop demo of Idira Secure Workload Access: real workloads fetch real secrets via SPIFFE identity, with zero static credentials.
 
-![Portal split view with the resolved trust diagram fully walked](docs/img/portal-resolved.png)
+![Portal split view with resolved topology and shipment manifest visible](docs/img/portal-resolved.png)
 
 ## Table of contents
 

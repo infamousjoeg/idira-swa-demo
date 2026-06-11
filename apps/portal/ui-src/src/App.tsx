@@ -1,11 +1,12 @@
 // App -- wires the PortalPane (left) and InspectorChrome + visualizations
 // (right) to the resolve engine, pace controls, and view/pace DarkSeg
-// controls. M-UI3: right pane fully wired with three visualizations.
+// controls. M-UI4: keyboard accessibility + foreign-trust URI passthrough.
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { GitFork, Layers, Terminal } from "lucide-react";
 import { PortalPane } from "./components/PortalPane";
 import { DarkSeg } from "./components/DarkSeg";
 import { InspectorChrome } from "./components/InspectorChrome";
+import { AccessibilityHints } from "./components/AccessibilityHints";
 import { TopologyInspector } from "./visualizations/TopologyInspector";
 import { LayersInspector } from "./visualizations/LayersInspector";
 import { TraceInspector } from "./visualizations/TraceInspector";
@@ -77,6 +78,13 @@ export function App() {
     [view, pace],
   );
 
+  // Real foreign peer URI captured from mtls.peer_uri_seen on the error path.
+  // Passed to visualizations so Topology shows the actual URI, not hardcoded.
+  const foreignPeerUri =
+    engine.error?.payload?.uri != null
+      ? String(engine.error.payload.uri)
+      : undefined;
+
   // Shared props for all three visualizations.
   const vizProps = {
     status: engine.status,
@@ -84,6 +92,7 @@ export function App() {
     completed: engine.completed,
     carrier,
     jwtTtl: engine.jwtTtl,
+    foreignPeerUri,
   } as const;
 
   return (
@@ -96,8 +105,11 @@ export function App() {
         overflow: "hidden",
       }}
     >
+      <AccessibilityHints onReset={handleReset} targetId="main-content" />
+
       {/* Left pane: portal (44%) */}
       <div
+        id="main-content"
         style={{
           flex: "0 0 44%",
           minWidth: 440,

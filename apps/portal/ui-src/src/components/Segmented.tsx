@@ -1,5 +1,7 @@
 // Segmented -- carrier selector (internal / external) from portal.jsx.
 // Two-option segmented control with an animated active indicator.
+// Keyboard: arrow keys cycle between options (WAI-ARIA tablist pattern).
+import { useCallback, useRef } from "react";
 
 interface SegmentedProps {
   value: "internal" | "external";
@@ -33,6 +35,7 @@ const segStyles = {
     letterSpacing: "-0.005em",
     borderRadius: 7,
     transition: "color 160ms var(--ease-standard)",
+    outline: "none",
   },
   active: {
     position: "absolute" as const,
@@ -45,15 +48,40 @@ const segStyles = {
 };
 
 export function Segmented({ value, onChange, disabled = false }: SegmentedProps) {
+  const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // Arrow keys cycle between the two tabs per WAI-ARIA tablist pattern.
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (disabled) return;
+      const idx = opts.findIndex((o) => o.v === value);
+      let next = -1;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        next = (idx + 1) % opts.length;
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        next = (idx - 1 + opts.length) % opts.length;
+      }
+      const target = next >= 0 ? opts[next] : undefined;
+      if (target) {
+        e.preventDefault();
+        onChange(target.v);
+        btnRefs.current[next]?.focus();
+      }
+    },
+    [value, onChange, disabled],
+  );
+
   return (
-    <div role="tablist" style={segStyles.root}>
-      {opts.map((o) => {
+    <div role="tablist" style={segStyles.root} onKeyDown={handleKeyDown}>
+      {opts.map((o, i) => {
         const on = value === o.v;
         return (
           <button
             key={o.v}
+            ref={(el) => { btnRefs.current[i] = el; }}
             role="tab"
             aria-selected={on}
+            tabIndex={on ? 0 : -1}
             disabled={disabled}
             onClick={() => onChange(o.v)}
             style={{

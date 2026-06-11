@@ -141,6 +141,7 @@ export function TopologyInspector({
   completed,
   carrier,
   jwtTtl,
+  foreignPeerUri,
 }: InspectorProps) {
   const ext = carrier === "external";
   const errored = status === "error";
@@ -273,7 +274,7 @@ export function TopologyInspector({
           >
             <Kv
               k="SAN URI"
-              v={ext ? SWA.spiffe.foreign : SWA.spiffe.carrier}
+              v={ext ? (foreignPeerUri ?? SWA.spiffe.foreign) : SWA.spiffe.carrier}
               vColor={ext ? INK.danger : undefined}
             />
             <div style={ts.validRow}>
