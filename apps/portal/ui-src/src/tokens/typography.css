@@ -1,5 +1,5 @@
 /* ============================================================
-   Idira Design System — Typography Tokens
+   Idira Design System -- Typography Tokens
    Brand display = TT Hoves (subst. Hanken Grotesk for web).
    Web body per PAN = Helvetica Neue. Mono = IBM Plex Mono.
    Casing: sentence case for copy; SMALL CAPS / ALL CAPS used
@@ -19,7 +19,7 @@
   --fw-bold:     700; /* @kind other */
   --fw-extra:    800; /* @kind other */
 
-  /* Type scale — 1.250 major-third, base 16px ---------------- */
+  /* Type scale -- 1.250 major-third, base 16px ---------------- */
   --fs-display:  clamp(2.75rem, 1.6rem + 3.6vw, 4.5rem); /* @kind other */
   --fs-h1:       2.5rem;    /* 40 */
   --fs-h2:       2rem;      /* 32 */
@@ -30,7 +30,7 @@
   --fs-body:     1rem;      /* 16 */
   --fs-body-sm:  0.875rem;  /* 14 */
   --fs-caption:  0.8125rem; /* 13 */
-  --fs-micro:    0.6875rem; /* 11 — eyebrows / labels */
+  --fs-micro:    0.6875rem; /* 11 -- eyebrows / labels */
 
   /* Line heights -------------------------------------------- */
   --lh-tight:   1.1;  /* @kind other */

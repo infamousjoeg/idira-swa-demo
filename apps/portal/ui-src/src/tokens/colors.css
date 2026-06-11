@@ -1,12 +1,12 @@
 /* ============================================================
-   Idira Design System — Color Tokens
+   Idira Design System -- Color Tokens
    Source: Identity Platform Brand Supplement (Nov 2025) +
            Palo Alto Networks Brand Guidelines (May 2026)
    ============================================================ */
 
 :root {
   /* ----------------------------------------------------------
-     IDIRA IDENTITY BLUE  — the GTM signature color.
+     IDIRA IDENTITY BLUE  -- the GTM signature color.
      "Blue symbolizes trust. Its calming presence evokes
       feelings of security and order." Five-step ramp 0→1000.
      ---------------------------------------------------------- */
@@ -17,7 +17,7 @@
   --idira-blue-1000: #061D63; /* darkest        R6   G29  B99  */
 
   /* ----------------------------------------------------------
-     PALO ALTO NETWORKS CYBER ORANGE — parent-brand primary.
+     PALO ALTO NETWORKS CYBER ORANGE -- parent-brand primary.
      Used for the corporate logo and rare parent-brand accents.
      Idira surfaces stay blue; orange is the parent signature.
      ---------------------------------------------------------- */
@@ -28,7 +28,7 @@
   --pan-orange-1000: #190000; /* deep brown-black gradient end */
 
   /* ----------------------------------------------------------
-     NEUTRALS — ink, surfaces, lines. Cool-leaning greys that
+     NEUTRALS -- ink, surfaces, lines. Cool-leaning greys that
      sit comfortably beside Identity Blue. 0 = white, 1000 = near-black.
      ---------------------------------------------------------- */
   --neutral-0:    #FFFFFF;
@@ -45,21 +45,21 @@
   --neutral-900:  #121826;
   --neutral-1000: #0A0E18;
 
-  /* Idira ink — the near-black used for body text carries a
+  /* Idira ink -- the near-black used for body text carries a
      faint blue cast rather than pure neutral. */
   --idira-ink:    #0B1020;
 
   /* ----------------------------------------------------------
-     GTM FAMILY ACCENTS — sibling product line signatures.
+     GTM FAMILY ACCENTS -- sibling product line signatures.
      Use only to reference another product, never as Idira UI color.
      ---------------------------------------------------------- */
-  --gtm-prisma-blue:   #00C0E8; /* Prisma — Cloud Blue        */
-  --gtm-cortex-green:  #00CC66; /* Cortex — Intelligence Green */
-  --gtm-unit42-red:    #C84727; /* Unit 42 — Fire Red          */
-  --gtm-strata-yellow: #FFCB06; /* Strata — Security Yellow    */
+  --gtm-prisma-blue:   #00C0E8; /* Prisma -- Cloud Blue        */
+  --gtm-cortex-green:  #00CC66; /* Cortex -- Intelligence Green */
+  --gtm-unit42-red:    #C84727; /* Unit 42 -- Fire Red          */
+  --gtm-strata-yellow: #FFCB06; /* Strata -- Security Yellow    */
 
   /* ----------------------------------------------------------
-     SEMANTIC STATUS — built around the security domain.
+     SEMANTIC STATUS -- built around the security domain.
      Blue is reserved for brand/primary, so status greens/reds
      are tuned to read clearly against Idira blue surfaces.
      ---------------------------------------------------------- */
@@ -73,7 +73,7 @@
   --status-info-bg:    #E6ECFF;
 
   /* ----------------------------------------------------------
-     SEMANTIC ALIASES — reference these in components, not raw ramps.
+     SEMANTIC ALIASES -- reference these in components, not raw ramps.
      ---------------------------------------------------------- */
   --brand:               var(--idira-blue-500);
   --brand-strong:        var(--idira-blue-750);

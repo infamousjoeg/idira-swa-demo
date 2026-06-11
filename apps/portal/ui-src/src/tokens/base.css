@@ -1,5 +1,5 @@
 /* ============================================================
-   Idira Design System — Base element defaults
+   Idira Design System -- Base element defaults
    Lightweight, opt-in foundation. Sets body type, headings,
    links, selection, and focus to brand defaults.
    ============================================================ */
@@ -45,7 +45,7 @@ small { font-size: var(--fs-caption); }
 
 :focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-sm); }
 
-/* Eyebrow / label utility — small caps, wide tracking */
+/* Eyebrow / label utility -- small caps, wide tracking */
 .idira-eyebrow {
   font-family: var(--font-sans);
   font-size: var(--fs-micro);
