@@ -9,6 +9,15 @@ export default defineConfig({
   build: {
     outDir: resolve(__dirname, "../ui"),
     emptyOutDir: true,
+    // Explicit determinism: no sourcemaps, content-hash filenames only.
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        entryFileNames: "assets/[name]-[hash].js",
+        chunkFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash][extname]",
+      },
+    },
   },
   server: {
     // Proxy API calls to the Go portal during dev.
