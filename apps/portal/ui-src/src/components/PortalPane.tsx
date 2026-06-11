@@ -18,6 +18,17 @@ import { RouteStrip } from "./RouteStrip";
 import { Evidence } from "./Evidence";
 import type { EngineStatus, ResolveResult, ResolveError } from "../engine/useResolveEngine";
 
+/** "2026-06-09T14:00:00Z" -> "Jun 9, 14:00 UTC" */
+function formatEtaShort(raw: string): string {
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+  const mon = d.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
+  const day = d.getUTCDate();
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${mon} ${day}, ${hh}:${mm} UTC`;
+}
+
 interface PortalPaneProps {
   carrier: "internal" | "external";
   setCarrier: (v: "internal" | "external") => void;
@@ -147,6 +158,10 @@ const ps = {
   },
   mfKey: { fontSize: 12.5, color: "var(--text-muted)", letterSpacing: "0.01em" },
   mfVal: { fontSize: 14, fontWeight: 600, color: "var(--text-body)" },
+  errAccent: {
+    borderLeft: "3px solid var(--status-danger)",
+    paddingLeft: 12,
+  },
   errBar: { display: "flex", alignItems: "center", justifyContent: "space-between" },
   errCode: {
     display: "flex",
@@ -158,6 +173,15 @@ const ps = {
     fontWeight: 600,
   },
   errMsg: { margin: 0, fontSize: 13.5, color: "var(--text-muted)", lineHeight: 1.55 },
+  errUriChip: {
+    border: "1px solid #FF7A57",
+    borderRadius: 8,
+    padding: "8px 12px",
+    fontFamily: "var(--font-mono)",
+    fontSize: 12,
+    color: "var(--text-muted)",
+    wordBreak: "break-all" as const,
+  },
 };
 
 function ManifestRow({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
@@ -199,7 +223,17 @@ export function PortalPane({
       {/* app chrome */}
       <header style={ps.appbar}>
         <div style={ps.brand}>
-          <PraetorMark />
+          <div
+            style={{
+              display: "inline-flex",
+              animation:
+                done
+                  ? "praetorHit 240ms cubic-bezier(0.16, 1, 0.3, 1) both"
+                  : "none",
+            }}
+          >
+            <PraetorMark />
+          </div>
           <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.05 }}>
             <span style={ps.brandName}>Praetor Logistics</span>
             <span style={ps.brandSub}>Shipment operations</span>
@@ -280,14 +314,14 @@ export function PortalPane({
               <RouteStrip
                 origin={r.origin ?? ""}
                 dest={r.destination ?? ""}
-                eta={r.eta ? `ETA ${r.eta}` : ""}
+                eta={r.eta ?? ""}
               />
               <div style={ps.manifest}>
                 {r.carrier_name && <ManifestRow k="Carrier" v={r.carrier_name} />}
                 {r.mode && <ManifestRow k="Mode" v={r.mode} />}
                 {r.container && <ManifestRow k="Container" v={r.container} mono />}
                 {r.weight && <ManifestRow k="Gross weight" v={r.weight} />}
-                {r.eta && <ManifestRow k="ETA" v={r.eta} />}
+                {r.eta && <ManifestRow k="ETA" v={formatEtaShort(r.eta)} />}
               </div>
               <Evidence kind="success" />
             </div>
@@ -295,12 +329,14 @@ export function PortalPane({
 
           {isError && (
             <div style={ps.resultIn}>
-              <div style={ps.errBar}>
-                <div style={ps.errCode}>
-                  <XOctagon size={18} />
-                  <span>502 -- resolve failed</span>
+              <div style={ps.errAccent}>
+                <div style={ps.errBar}>
+                  <div style={ps.errCode}>
+                    <XOctagon size={18} />
+                    <span>502 -- resolve failed</span>
+                  </div>
+                  <Tag tone="brand">mTLS rejected</Tag>
                 </div>
-                <Tag tone="brand">mTLS rejected</Tag>
               </div>
               <p style={ps.errMsg}>
                 {error?.message
@@ -308,7 +344,7 @@ export function PortalPane({
                   : "The external carrier could not be authenticated. No secret was issued, so the shipment manifest cannot be returned."}
               </p>
               {error?.payload?.uri != null && (
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)", wordBreak: "break-all" as const }}>
+                <div style={ps.errUriChip}>
                   {String(error.payload.uri)}
                 </div>
               )}

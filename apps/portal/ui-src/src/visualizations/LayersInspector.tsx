@@ -12,6 +12,7 @@ import {
   ShieldOff,
 } from "lucide-react";
 import { INK, Meter, fmtTtl, type InspectorProps } from "./common";
+import { ShuffleDigits } from "./ShuffleDigits";
 import { SWA } from "../engine/swa";
 
 type LayerState = "locked" | "active" | "passed" | "rejected";
@@ -278,7 +279,7 @@ export function LayersInspector({
                             display: "block",
                           }}
                         >
-                          token ttl {fmtTtl(jwtTtl)}
+                          token ttl <ShuffleDigits value={fmtTtl(jwtTtl)} />
                         </span>
                       </div>
                     )}

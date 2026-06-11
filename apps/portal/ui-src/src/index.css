@@ -76,6 +76,20 @@
   50%, 100% { opacity: 0; }
 }
 
+/* Topology: brand-blue flash sweep on resolve-success (one-shot). */
+@keyframes topoFlash {
+  0%   { opacity: 0; transform: translateX(-100%); }
+  40%  { opacity: 0.4; }
+  100% { opacity: 0; transform: translateX(100%); }
+}
+
+/* Portal pane: PraetorMark success pulse (one-shot). */
+@keyframes praetorHit {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
 /* Skip-to-content link: visible only on :focus-visible. */
 a[href="#main-content"]:focus-visible {
   position: fixed !important;

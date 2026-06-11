@@ -2,6 +2,17 @@
 // Shows origin city, a connecting line with ship icon, and destination city.
 import { Ship } from "lucide-react";
 
+/** "2026-06-09T14:00:00Z" -> "Jun 9, 14:00 UTC" */
+function formatEta(raw: string): string {
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+  const mon = d.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
+  const day = d.getUTCDate();
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${mon} ${day}, ${hh}:${mm} UTC`;
+}
+
 interface RouteStripProps {
   origin: string;
   dest: string;
@@ -84,7 +95,7 @@ export function RouteStrip({ origin, dest, eta }: RouteStripProps) {
       </div>
       <div style={{ ...styles.routeEnd, alignItems: "flex-end", textAlign: "right" as const }}>
         <span style={styles.routeCity}>{dest}</span>
-        <span style={styles.routeLbl}>{eta}</span>
+        <span style={styles.routeLbl}>{eta ? `ETA ${formatEta(eta)}` : ""}</span>
       </div>
     </div>
   );

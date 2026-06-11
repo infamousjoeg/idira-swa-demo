@@ -4,6 +4,7 @@
 // each stage fires. Ported from inspector_topology.jsx.
 import { ShieldX, Lock, CircleCheckBig, ShieldOff } from "lucide-react";
 import { INK, Meter, Kv, fmtTtl, type InspectorProps } from "./common";
+import { ShuffleDigits } from "./ShuffleDigits";
 import { SWA } from "../engine/swa";
 
 type CardVisualState = "locked" | "active" | "done";
@@ -90,7 +91,14 @@ function NodeCard({
         boxShadow: isActive
           ? "0 0 0 1px var(--idira-blue-500), 0 8px 30px rgba(38,91,255,0.25)"
           : "none",
-        opacity: state === "locked" && !children ? 0.55 : 1,
+        opacity:
+          state === "locked"
+            ? children
+              ? 0.7
+              : 0.35
+            : state === "done"
+              ? 0.85
+              : 1,
         animation: isActive
           ? "topoPop 360ms var(--ease-emphasis) both"
           : "none",
@@ -184,32 +192,38 @@ export function TopologyInspector({
         ? "active"
         : "locked";
 
+  const bracketColor =
+    mtlsState === "rejected"
+      ? INK.dangerLine
+      : mtlsState === "done" || mtlsState === "active"
+        ? "var(--idira-blue-500)"
+        : INK.line;
+
+  const bracketLabelColor =
+    mtlsState === "rejected"
+      ? INK.danger
+      : mtlsState === "done"
+        ? INK.ok
+        : mtlsState === "active"
+          ? INK.mono
+          : INK.dim;
+
   return (
     <div style={ts.scroll}>
       <div style={ts.canvas}>
-        {/* mTLS bracket chip */}
-        <div style={ts.mtlsChipWrap}>
+        {/* mTLS bracket spanning Portal + Carrier cards */}
+        <div
+          style={{
+            ...ts.bracket,
+            borderColor: bracketColor,
+            borderStyle: mtlsState === "rejected" ? "dashed" : "solid",
+          }}
+        >
+          {/* cipher label floating in the bracket top border */}
           <div
             style={{
-              ...ts.mtlsChip,
-              color:
-                mtlsState === "rejected"
-                  ? INK.danger
-                  : mtlsState === "done"
-                    ? INK.ok
-                    : mtlsState === "active"
-                      ? INK.mono
-                      : INK.dim,
-              borderColor:
-                mtlsState === "rejected"
-                  ? INK.dangerLine
-                  : mtlsState === "done" || mtlsState === "active"
-                    ? "var(--idira-blue-500)"
-                    : INK.line,
-              background:
-                mtlsState === "rejected"
-                  ? "rgba(250,88,45,0.1)"
-                  : "rgba(6,18,55,0.7)",
+              ...ts.bracketLabel,
+              color: bracketLabelColor,
             }}
           >
             {mtlsState === "rejected" ? (
@@ -225,10 +239,9 @@ export function TopologyInspector({
                   ? "negotiating mutual TLS..."
                   : "mutual TLS"}
           </div>
-        </div>
 
-        {/* Portal + Carrier pair row */}
-        <div style={ts.pairRow}>
+          {/* Portal + Carrier pair row */}
+          <div style={ts.pairRow}>
           <NodeCard
             title="Portal"
             tag="X.509-SVID"
@@ -290,6 +303,7 @@ export function TopologyInspector({
               {ext ? "issuer: acme.courier CA" : "RSA-2048 · rotates 60m"}
             </span>
           </NodeCard>
+          </div>
         </div>
 
         <VLink state={linkJwt} />
@@ -318,7 +332,7 @@ export function TopologyInspector({
                     marginTop: 2,
                   }}
                 >
-                  {fmtTtl(jwtTtl)}
+                  <ShuffleDigits value={fmtTtl(jwtTtl)} />
                 </div>
               </div>
               <div style={{ gridColumn: "1 / -1", marginTop: 2 }}>
@@ -410,12 +424,29 @@ export function TopologyInspector({
           </div>
         )}
       </div>
+
+      {/* resolve-success flash sweep (one-shot 280ms) */}
+      {status === "done" && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background:
+              "linear-gradient(90deg, transparent, rgba(38,91,255,0.4), transparent)",
+            animation:
+              "topoFlash 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
+            pointerEvents: "none" as const,
+            zIndex: 10,
+          }}
+        />
+      )}
     </div>
   );
 }
 
 const ts = {
   scroll: {
+    position: "relative" as const,
     height: "100%",
     overflowY: "auto" as const,
     padding: "22px 30px 30px",
@@ -426,22 +457,32 @@ const ts = {
     display: "flex",
     flexDirection: "column" as const,
   },
-  mtlsChipWrap: {
-    display: "flex",
-    justifyContent: "center",
-    marginBottom: 12,
+  bracket: {
+    position: "relative" as const,
+    borderTop: "1.5px solid",
+    borderLeft: "1.5px solid",
+    borderRight: "1.5px solid",
+    borderBottom: "none",
+    borderRadius: "10px 10px 0 0",
+    paddingTop: 20,
+    marginBottom: 0,
+    transition: "border-color 300ms var(--ease-standard)",
   },
-  mtlsChip: {
+  bracketLabel: {
+    position: "absolute" as const,
+    top: 0,
+    left: "50%",
+    transform: "translate(-50%, -50%)",
+    background: "#0A1A4A",
+    padding: "4px 14px",
     display: "inline-flex",
     alignItems: "center",
     gap: 7,
     fontFamily: "var(--font-mono)",
     fontSize: 11.5,
-    padding: "6px 13px",
-    borderRadius: 999,
-    border: "1px solid",
     letterSpacing: "0.01em",
-    transition: "all 300ms var(--ease-standard)",
+    whiteSpace: "nowrap" as const,
+    transition: "color 300ms var(--ease-standard)",
   },
   pairRow: {
     display: "grid",

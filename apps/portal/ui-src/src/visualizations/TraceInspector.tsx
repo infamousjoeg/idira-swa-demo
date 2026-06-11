@@ -14,6 +14,7 @@ import {
   ShieldOff,
 } from "lucide-react";
 import { INK, Meter, fmtTtl, type InspectorProps } from "./common";
+import { ShuffleDigits } from "./ShuffleDigits";
 import { SWA } from "../engine/swa";
 
 // Node strip definitions: the five participants in the identity exchange.
@@ -356,7 +357,7 @@ export function TraceInspector({
                 color: INK.ok,
               }}
             >
-              {fmtTtl(jwtTtl)} left
+              <ShuffleDigits value={fmtTtl(jwtTtl)} /> left
             </span>
           </div>
           <Meter pct={Math.round((jwtTtl / 300) * 100)} active />
