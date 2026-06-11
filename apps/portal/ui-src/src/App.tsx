@@ -1,19 +1,44 @@
-// App -- wires the PortalPane to the resolve engine and pace controls.
-// M-UI2: left pane only. M-UI3 adds the inspector (right pane).
-import { useState, useCallback, useEffect } from "react";
+// App -- wires the PortalPane (left) and InspectorChrome + visualizations
+// (right) to the resolve engine, pace controls, and view/pace DarkSeg
+// controls. M-UI3: right pane fully wired with three visualizations.
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { GitFork, Layers, Terminal } from "lucide-react";
 import { PortalPane } from "./components/PortalPane";
+import { DarkSeg } from "./components/DarkSeg";
+import { InspectorChrome } from "./components/InspectorChrome";
+import { TopologyInspector } from "./visualizations/TopologyInspector";
+import { LayersInspector } from "./visualizations/LayersInspector";
+import { TraceInspector } from "./visualizations/TraceInspector";
 import { useResolveEngine } from "./engine/useResolveEngine";
 import * as paceQueue from "./engine/paceQueue";
+
+type ViewMode = "topology" | "layers" | "trace";
+type PaceMode = "off" | "fast" | "medium" | "slow";
+
+const VIEW_OPTIONS: { v: ViewMode; label: string; icon: React.ReactNode }[] = [
+  { v: "topology", label: "Topo", icon: <GitFork style={{ width: 13, height: 13 }} /> },
+  { v: "layers", label: "Layers", icon: <Layers style={{ width: 13, height: 13 }} /> },
+  { v: "trace", label: "Trace", icon: <Terminal style={{ width: 13, height: 13 }} /> },
+];
+
+const PACE_OPTIONS: { v: PaceMode; label: string }[] = [
+  { v: "off", label: "Off" },
+  { v: "fast", label: "Fast" },
+  { v: "medium", label: "Med" },
+  { v: "slow", label: "Slow" },
+];
 
 export function App() {
   const [shipmentId, setShipmentId] = useState("SHP-2049-883");
   const [carrier, setCarrier] = useState<"internal" | "external">("internal");
+  const [view, setView] = useState<ViewMode>("topology");
+  const [pace, setPace] = useState<PaceMode>("medium");
   const engine = useResolveEngine();
 
-  // Default pace is medium. M-UI3 will add a UI control for this.
+  // Wire pace state to the paceQueue module.
   useEffect(() => {
-    paceQueue.setPace("medium");
-  }, []);
+    paceQueue.setPace(pace);
+  }, [pace]);
 
   // Carrier toggle resets the engine (spec: reset() called on carrier change).
   const handleCarrierChange = useCallback(
@@ -28,8 +53,42 @@ export function App() {
     engine.run(carrier, shipmentId);
   }, [engine, carrier, shipmentId]);
 
+  const handleReset = useCallback(() => {
+    engine.reset();
+  }, [engine]);
+
+  // DarkSeg controls rendered in the InspectorChrome header.
+  const inspectorControls = useMemo(
+    () => (
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <DarkSeg<ViewMode>
+          value={view}
+          onChange={setView}
+          options={VIEW_OPTIONS}
+        />
+        <DarkSeg<PaceMode>
+          value={pace}
+          onChange={setPace}
+          options={PACE_OPTIONS}
+          label="Pace"
+        />
+      </div>
+    ),
+    [view, pace],
+  );
+
+  // Shared props for all three visualizations.
+  const vizProps = {
+    status: engine.status,
+    stage: engine.stage,
+    completed: engine.completed,
+    carrier,
+    jwtTtl: engine.jwtTtl,
+  } as const;
+
   return (
     <div
+      data-motion="cinematic"
       style={{
         display: "flex",
         height: "100vh",
@@ -37,8 +96,15 @@ export function App() {
         overflow: "hidden",
       }}
     >
-      {/* Left pane: portal */}
-      <div style={{ flex: 1, minWidth: 0, height: "100%" }}>
+      {/* Left pane: portal (44%) */}
+      <div
+        style={{
+          flex: "0 0 44%",
+          minWidth: 440,
+          maxWidth: 640,
+          height: "100%",
+        }}
+      >
         <PortalPane
           carrier={carrier}
           setCarrier={handleCarrierChange}
@@ -52,23 +118,19 @@ export function App() {
         />
       </div>
 
-      {/* Right pane: inspector placeholder (M-UI3 scope) */}
-      <div
-        style={{
-          flex: 1,
-          minWidth: 0,
-          height: "100%",
-          background:
-            "radial-gradient(120% 90% at 80% 0%, #0E2A78 0%, #061D63 38%, #050F38 100%)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "rgba(196,210,250,0.62)",
-          fontFamily: "var(--font-mono)",
-          fontSize: 13,
-        }}
-      >
-        Inspector (M-UI3)
+      {/* Right pane: inspector (flex 1) */}
+      <div style={{ flex: 1, minWidth: 0, height: "100%" }}>
+        <InspectorChrome
+          status={engine.status}
+          stage={engine.stage}
+          shimmer
+          controls={inspectorControls}
+          onReset={handleReset}
+        >
+          {view === "topology" && <TopologyInspector {...vizProps} />}
+          {view === "layers" && <LayersInspector {...vizProps} />}
+          {view === "trace" && <TraceInspector {...vizProps} />}
+        </InspectorChrome>
       </div>
     </div>
   );
