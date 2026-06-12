@@ -25,7 +25,7 @@
 
 A self-contained sandbox that runs the full Idira Secure Workload Access (SWA) stack on a single kind cluster on your Mac. Two Go demo apps (`carrier` and `portal`) authenticate to a real Idira Secrets Manager - SaaS tenant using short-lived SPIFFE-issued credentials and fetch a real secret. No API key is ever baked into an image, mounted from a file, or typed into a config. Time from `make up` to a running portal is about four minutes on a clean clone.
 
-The point is to make the identity exchange visible. The portal UI splits left and right so you can watch each SVID get issued, each mTLS handshake complete, and each Secrets Manager REST call land, in real time, on every click. Click any lit card in the trust diagram to flip it open and see decoded claims, full certificate metadata, or the raw bearer-token exchange.
+The point is to make the identity exchange visible. The portal UI is a split-pane Idira product surface: a Praetor Logistics shipment-lookup portal on the left (the consumer app, with voyage progress, manifest, and recent-activity feed) and a live Idira Inspector on the right (the identity machinery, visualized). Three swappable inspector views (Topology, Layers, Trace) all read the same engine state so you can pick the framing that lands best with the room. A Carrier toggle (Internal / External) flips between the success path and the M7 foreign-trust-domain rejection, which terminates at the wire layer in Go's standard `crypto/tls` verifier and surfaces the rejected cert's SPIFFE URI in an orange callout chip.
 
 New to SPIFFE or workload identity? Start with [Concepts](https://github.com/infamousjoeg/idira-swa-demo/wiki/Concepts) on the Wiki, or work through the interactive visualizations at [thesecretlivesofidentity.com](https://thesecretlivesofidentity.com).
 
@@ -41,7 +41,7 @@ make portforward PORT=18080         # serve the portal on http://localhost:18080
 make down                           # tear everything back down
 ```
 
-Open `http://localhost:18080` once `make portforward PORT=18080` is running, then click **RESOLVE SECRET** to watch the trust diagram walk.
+Open `http://localhost:18080` once `make portforward PORT=18080` is running, then click **Resolve secret** to watch the trust diagram walk. Present at 1920x1080 or larger; the layout was designed and visual-regression-tested at that demo viewport.
 
 The first `make up` takes about four minutes: it loads SWA container images into the kind cluster, applies Terraform against your tenant, installs the two Helm charts, and builds the demo Go services. Subsequent cycles after `make down` finish in about two minutes.
 
@@ -62,9 +62,13 @@ Hand-installing instead of running `make setup`? See [Manual prereqs](https://gi
 
 ## What you will see when it runs
 
-The left pane is a plausible internal shipment-lookup portal: type a shipment ID, click **RESOLVE SECRET**, get a shipment record. The right pane is a live SPIFFE trust diagram that paints itself in real time as the resolve flows through, with cards for the trust hierarchy, the portal-to-carrier mTLS edge, the JWT-SVID hero panel, and the Secrets Manager exchange.
+The left pane is a plausible internal shipment-lookup portal: type a shipment ID, pick a carrier (Internal or External), click **Resolve secret**, get back a shipment record with a voyage progress strip (Loaded -> In transit -> Arrived), manifest fields with container details, and a recent-activity feed. The right pane is the live Idira Inspector: the same SPIFFE trust machinery rendered three different ways. Pick the view that lands best with your room.
 
-Every lit card is clickable: flip it open to see decoded JWT claims, full X.509 metadata, or the raw bearer-token exchange. A click resolves in well under 200 ms; the diagram paces itself over about 2.25 seconds by default so a human can follow each stage. The pace toggle in the inspector header and `?pace=off` in the URL give you faster or fully real-time behavior on demand.
+- **Topology** (default) is a vertical trust-path diagram with workload cards joined under an mTLS bracket, descending through JWT-SVID, Secrets Manager, and the returned secret.
+- **Layers** is the brand "gates of defense" rendered structurally: five stacked horizontal layers (Node attestation, Mutual TLS, JWT-SVID, Access token, Secret) illuminating left-to-right as the request passes through them.
+- **Trace** is the streaming identity log: a compact node strip across the top and timestamped SSE-style event rows below.
+
+Switching views mid-resolve preserves engine state. A click resolves in well under 200 ms on the wire; the inspector paces itself for legibility (Off / Fast / Med / Slow segmented in the chrome, or `?pace=off` in the URL for fully real-time behavior). The TTL meter at the top of the inspector reads the real `exp` of the freshly minted JWT-SVID and counts down live. The carrier toggle on the left resets the engine so you can A/B the success and rejection paths cleanly.
 
 Full screenshot walkthrough and wire-trace breakdown: [Portal tour](https://github.com/infamousjoeg/idira-swa-demo/wiki/Portal-tour) and [Wire trace](https://github.com/infamousjoeg/idira-swa-demo/wiki/Wire-trace).
 
