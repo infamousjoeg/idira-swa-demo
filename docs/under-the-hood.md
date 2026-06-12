@@ -353,11 +353,13 @@ stages below are dimmed and marked `SKIPPED` -- they genuinely never executed.
 A `TRUST BOUNDARY` tile appears at the bottom of the inspector with copy
 explaining the rejection in SPIFFE terms.
 
-**Inspect the rejected cert.** Click the ACME card to flip it. The back shows
-the foreign cert's fields: empty Subject (SPIFFE identity lives in the SAN URI),
-Issuer `CN=acme.courier root` (Acme's own self-signed CA), the SAN URI, and
-the signature algorithm. This is the actual certificate the portal rejected --
-not a hardcoded label, not a simulation.
+**Inspect the rejected cert.** The Topology inspector renders the ACME card in
+dashed orange treatment with the foreign SPIFFE URI shown in a `#FF7A57`
+callout chip directly on the card. The portal left pane shows the same URI
+in an orange-bordered chip below the "502 - resolve failed" bar. This is the
+actual certificate the portal rejected, extracted from the typed
+`*tls.CertificateVerificationError.UnverifiedCertificates` returned by Go's
+standard verifier -- not a hardcoded label, not a simulation.
 
 **The takeaway.** Trust-domain boundaries are real and SWA enforces them today.
 Cross-trust-domain federation (where two trust domains can agree to verify
@@ -365,8 +367,8 @@ each other's identities) is on the SWA roadmap. Until federation ships, there
 is no UI toggle, no manual override, and no demo trick that will make this
 handshake succeed -- the rejection is the lesson.
 
-**Toggle back.** Click **INTERNAL** in the selector. The diagram resets to
-its bootstrap state; the Beat 1 flow is ready to run again.
+**Toggle back.** Click **Internal carrier** in the selector. The engine resets
+to its bootstrap state; the Beat 1 flow is ready to run again.
 
 ---
 

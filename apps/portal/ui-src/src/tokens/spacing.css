@@ -1,0 +1,59 @@
+/* ============================================================
+   Idira Design System -- Spacing, Radius, Shadow, Motion, Layout
+   8px base grid. Radii are restrained (geometric, not pill-y) to
+   echo the solid, three-dimensional Idira icon.
+   ============================================================ */
+
+:root {
+  /* Spacing scale -- 8px base ------------------------------- */
+  --space-0:   0;
+  --space-1:   0.25rem;  /* 4  */
+  --space-2:   0.5rem;   /* 8  */
+  --space-3:   0.75rem;  /* 12 */
+  --space-4:   1rem;     /* 16 */
+  --space-5:   1.5rem;   /* 24 */
+  --space-6:   2rem;     /* 32 */
+  --space-7:   2.5rem;   /* 40 */
+  --space-8:   3rem;     /* 48 */
+  --space-9:   4rem;     /* 64 */
+  --space-10:  5rem;     /* 80 */
+  --space-12:  6rem;     /* 96 */
+
+  /* Radii -- geometric, modest ------------------------------ */
+  --radius-xs:   3px;
+  --radius-sm:   6px;
+  --radius-md:   10px;   /* default control / card */
+  --radius-lg:   14px;
+  --radius-xl:   20px;
+  --radius-2xl:  28px;
+  --radius-pill: 999px;  /* tags, status pills only */
+
+  /* Borders ------------------------------------------------ */
+  --border-width:   1px;   /* @kind spacing */
+  --border-width-2: 1.5px; /* @kind spacing */
+  --focus-ring:     0 0 0 3px rgba(38, 91, 255, 0.32);
+
+  /* Elevation -- cool, blue-tinted shadows ------------------ */
+  --shadow-xs:  0 1px 2px rgba(11, 16, 32, 0.06);
+  --shadow-sm:  0 1px 3px rgba(11, 16, 32, 0.08), 0 1px 2px rgba(11, 16, 32, 0.04);
+  --shadow-md:  0 4px 12px rgba(11, 16, 32, 0.08), 0 2px 4px rgba(11, 16, 32, 0.05);
+  --shadow-lg:  0 12px 28px rgba(11, 16, 32, 0.12), 0 4px 8px rgba(11, 16, 32, 0.06);
+  --shadow-xl:  0 24px 56px rgba(11, 16, 32, 0.18), 0 8px 16px rgba(11, 16, 32, 0.08);
+  --shadow-brand: 0 8px 24px rgba(38, 91, 255, 0.28);
+
+  /* Motion -- confident, no bounce -------------------------- */
+  --ease-standard:  cubic-bezier(0.2, 0, 0.1, 1);   /* @kind other */
+  --ease-emphasis:  cubic-bezier(0.16, 1, 0.3, 1);  /* @kind other */
+  --ease-out:       cubic-bezier(0, 0, 0.2, 1);     /* @kind other */
+  --dur-fast:   120ms; /* @kind other */
+  --dur-base:   200ms; /* @kind other */
+  --dur-slow:   320ms; /* @kind other */
+
+  /* Layout -------------------------------------------------- */
+  --container-sm:  640px;  /* @kind spacing */
+  --container-md:  960px;  /* @kind spacing */
+  --container-lg:  1200px; /* @kind spacing */
+  --container-xl:  1400px; /* @kind spacing */
+  --sidebar-w:     264px;  /* @kind spacing */
+  --topbar-h:      60px;   /* @kind spacing */
+}

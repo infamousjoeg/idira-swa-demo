@@ -1,0 +1,48 @@
+/* ============================================================
+   Idira Design System -- Typography Tokens
+   Brand display = TT Hoves (subst. Hanken Grotesk for web).
+   Web body per PAN = Helvetica Neue. Mono = IBM Plex Mono.
+   Casing: sentence case for copy; SMALL CAPS / ALL CAPS used
+   sparingly for eyebrows, taglines, and the IDIRA wordmark.
+   ============================================================ */
+
+:root {
+  /* Families ------------------------------------------------ */
+  --font-sans:    "TT Hoves Pro", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-display: "TT Hoves Pro", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono:    "IBM Plex Mono", "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+
+  /* Weights ------------------------------------------------- */
+  --fw-regular:  400; /* @kind other */
+  --fw-medium:   500; /* @kind other */
+  --fw-semibold: 600; /* @kind other */
+  --fw-bold:     700; /* @kind other */
+  --fw-extra:    800; /* @kind other */
+
+  /* Type scale -- 1.250 major-third, base 16px ---------------- */
+  --fs-display:  clamp(2.75rem, 1.6rem + 3.6vw, 4.5rem); /* @kind other */
+  --fs-h1:       2.5rem;    /* 40 */
+  --fs-h2:       2rem;      /* 32 */
+  --fs-h3:       1.5rem;    /* 24 */
+  --fs-h4:       1.25rem;   /* 20 */
+  --fs-title:    1.125rem;  /* 18 */
+  --fs-body-lg:  1.0625rem; /* 17 */
+  --fs-body:     1rem;      /* 16 */
+  --fs-body-sm:  0.875rem;  /* 14 */
+  --fs-caption:  0.8125rem; /* 13 */
+  --fs-micro:    0.6875rem; /* 11 -- eyebrows / labels */
+
+  /* Line heights -------------------------------------------- */
+  --lh-tight:   1.1;  /* @kind other */
+  --lh-snug:    1.25; /* @kind other */
+  --lh-normal:  1.5;  /* @kind other */
+  --lh-relaxed: 1.65; /* @kind other */
+
+  /* Letter spacing ------------------------------------------ */
+  --ls-tight:   -0.02em;  /* @kind other */
+  --ls-snug:    -0.01em;  /* @kind other */
+  --ls-normal:  0;        /* @kind other */
+  --ls-wide:    0.02em;   /* @kind other */
+  --ls-eyebrow: 0.14em;   /* @kind other */
+  --ls-caps:    0.06em;   /* @kind other */
+}

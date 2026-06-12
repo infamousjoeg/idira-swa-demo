@@ -178,7 +178,7 @@ down: _check-env ## Tear down everything (cluster + tenant TF state). Best-effor
 	-kubectl delete ns swa-demo swa-system --wait=false 2>/dev/null
 	-kind delete cluster --name $(KIND_CLUSTER)
 
-.PHONY: tf-apply-app build-apps deploy-apps smoke-m2 up-m2
+.PHONY: tf-apply-app build-ui build-apps deploy-apps smoke-m2 up-m2
 
 # --- M2 targets (carrier service + secret) ---
 
@@ -190,7 +190,10 @@ tf-apply-app: _check-env tf-init ## Apply TF subset #2: jwt authn + policy + sec
 	    $(TF) apply -auto-approve -var sm_url=$(PANW_SM_URL)'
 	@$(TF) output -json | jq -r '"carrier_host_id   = " + .carrier_host_id.value, "carrier_secret_id = " + .carrier_secret_id.value'
 
-build-apps: ## Build the demo app images locally and load into kind
+build-ui: ## Build the portal React/Vite UI into apps/portal/ui/
+	cd apps/portal/ui-src && pnpm install --frozen-lockfile && pnpm run build
+
+build-apps: build-ui ## Build the demo app images locally and load into kind
 	docker build -t idira/carrier:m2      apps/carrier/
 	docker build -t idira/portal:m3       apps/portal/
 	docker build -t idira/acme-carrier:m7 apps/acme-carrier/

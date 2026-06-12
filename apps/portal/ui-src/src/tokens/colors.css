@@ -1,0 +1,116 @@
+/* ============================================================
+   Idira Design System -- Color Tokens
+   Source: Identity Platform Brand Supplement (Nov 2025) +
+           Palo Alto Networks Brand Guidelines (May 2026)
+   ============================================================ */
+
+:root {
+  /* ----------------------------------------------------------
+     IDIRA IDENTITY BLUE  -- the GTM signature color.
+     "Blue symbolizes trust. Its calming presence evokes
+      feelings of security and order." Five-step ramp 0→1000.
+     ---------------------------------------------------------- */
+  --idira-blue-0:    #ADC0FC; /* lightest tint  R173 G192 B252 */
+  --idira-blue-250:  #6186FC; /*                R97  G134 B252 */
+  --idira-blue-500:  #265BFF; /* PRIMARY        R38  G91  B255 */
+  --idira-blue-750:  #173EB8; /*                R23  G62  B184 */
+  --idira-blue-1000: #061D63; /* darkest        R6   G29  B99  */
+
+  /* ----------------------------------------------------------
+     PALO ALTO NETWORKS CYBER ORANGE -- parent-brand primary.
+     Used for the corporate logo and rare parent-brand accents.
+     Idira surfaces stay blue; orange is the parent signature.
+     ---------------------------------------------------------- */
+  --pan-orange-0:    #FFBF9C;
+  --pan-orange-250:  #FF724D;
+  --pan-orange-500:  #FA582D; /* Cyber Orange   R250 G88  B45  */
+  --pan-orange-750:  #B23808;
+  --pan-orange-1000: #190000; /* deep brown-black gradient end */
+
+  /* ----------------------------------------------------------
+     NEUTRALS -- ink, surfaces, lines. Cool-leaning greys that
+     sit comfortably beside Identity Blue. 0 = white, 1000 = near-black.
+     ---------------------------------------------------------- */
+  --neutral-0:    #FFFFFF;
+  --neutral-25:   #F7F9FC;
+  --neutral-50:   #EEF2F9;
+  --neutral-100:  #E2E8F2;
+  --neutral-200:  #CBD4E3;
+  --neutral-300:  #AEB9CC;
+  --neutral-400:  #8794AB;
+  --neutral-500:  #5F6B82;
+  --neutral-600:  #455066;
+  --neutral-700:  #2E384B;
+  --neutral-800:  #1C2435;
+  --neutral-900:  #121826;
+  --neutral-1000: #0A0E18;
+
+  /* Idira ink -- the near-black used for body text carries a
+     faint blue cast rather than pure neutral. */
+  --idira-ink:    #0B1020;
+
+  /* ----------------------------------------------------------
+     GTM FAMILY ACCENTS -- sibling product line signatures.
+     Use only to reference another product, never as Idira UI color.
+     ---------------------------------------------------------- */
+  --gtm-prisma-blue:   #00C0E8; /* Prisma -- Cloud Blue        */
+  --gtm-cortex-green:  #00CC66; /* Cortex -- Intelligence Green */
+  --gtm-unit42-red:    #C84727; /* Unit 42 -- Fire Red          */
+  --gtm-strata-yellow: #FFCB06; /* Strata -- Security Yellow    */
+
+  /* ----------------------------------------------------------
+     SEMANTIC STATUS -- built around the security domain.
+     Blue is reserved for brand/primary, so status greens/reds
+     are tuned to read clearly against Idira blue surfaces.
+     ---------------------------------------------------------- */
+  --status-success:    #0F9347;
+  --status-success-bg: #DEFEE3;
+  --status-warning:    #D69F25;
+  --status-warning-bg: #FFF0CC;
+  --status-danger:     #C84727;
+  --status-danger-bg:  #FFD7CF;
+  --status-info:       #265BFF;
+  --status-info-bg:    #E6ECFF;
+
+  /* ----------------------------------------------------------
+     SEMANTIC ALIASES -- reference these in components, not raw ramps.
+     ---------------------------------------------------------- */
+  --brand:               var(--idira-blue-500);
+  --brand-strong:        var(--idira-blue-750);
+  --brand-deep:          var(--idira-blue-1000);
+  --brand-soft:          var(--idira-blue-250);
+  --brand-tint:          var(--idira-blue-0);
+
+  --text-strong:         var(--idira-ink);
+  --text-body:           var(--neutral-800);
+  --text-muted:          var(--neutral-500);
+  --text-subtle:         var(--neutral-400);
+  --text-on-brand:       var(--neutral-0);
+  --text-on-dark:        #E6ECF7;
+  --text-link:           var(--idira-blue-500);
+
+  --surface-page:        var(--neutral-25);
+  --surface-card:        var(--neutral-0);
+  --surface-sunken:      var(--neutral-50);
+  --surface-raised:      var(--neutral-0);
+  --surface-inverse:     var(--neutral-900);
+  --surface-brand:       var(--idira-blue-500);
+  --surface-brand-tint:  #EEF2FF;
+  --surface-deep:        var(--idira-blue-1000);
+
+  --border-subtle:       var(--neutral-100);
+  --border-default:      var(--neutral-200);
+  --border-strong:       var(--neutral-300);
+  --border-brand:        var(--idira-blue-500);
+  --border-focus:        var(--idira-blue-500);
+
+  /* ----------------------------------------------------------
+     SIGNATURE GRADIENTS
+     Idira: 500 → 1000 (vibrant blue descending into the deep).
+     PAN:   Cyber Orange 500 → 1000 (energy + forward motion).
+     ---------------------------------------------------------- */
+  --gradient-idira:      linear-gradient(135deg, var(--idira-blue-500) 0%, var(--idira-blue-1000) 100%);
+  --gradient-idira-soft: linear-gradient(135deg, var(--idira-blue-250) 0%, var(--idira-blue-750) 100%);
+  --gradient-deep:       linear-gradient(160deg, #0E1A4D 0%, #061539 60%, #030B22 100%); /* @kind color */
+  --gradient-pan-orange: linear-gradient(120deg, var(--pan-orange-500) 0%, var(--pan-orange-1000) 100%);
+}

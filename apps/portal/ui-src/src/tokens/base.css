@@ -1,0 +1,56 @@
+/* ============================================================
+   Idira Design System -- Base element defaults
+   Lightweight, opt-in foundation. Sets body type, headings,
+   links, selection, and focus to brand defaults.
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-normal);
+  color: var(--text-body);
+  background: var(--surface-page);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  color: var(--text-strong);
+  margin: 0 0 var(--space-3);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-snug);
+  font-weight: var(--fw-bold);
+  text-wrap: balance;
+}
+
+h1 { font-size: var(--fs-h1); }
+h2 { font-size: var(--fs-h2); }
+h3 { font-size: var(--fs-h3); }
+h4 { font-size: var(--fs-h4); }
+
+p { margin: 0 0 var(--space-4); text-wrap: pretty; }
+
+a { color: var(--text-link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+code, kbd, samp, pre { font-family: var(--font-mono); font-size: 0.92em; }
+
+small { font-size: var(--fs-caption); }
+
+::selection { background: var(--idira-blue-250); color: var(--idira-blue-1000); }
+
+:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-sm); }
+
+/* Eyebrow / label utility -- small caps, wide tracking */
+.idira-eyebrow {
+  font-family: var(--font-sans);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--brand);
+}
