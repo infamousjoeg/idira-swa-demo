@@ -138,6 +138,62 @@ else
 fi
 
 echo
+echo 'Tenant cleanliness (orphans):'
+# An "orphan" is a tenant resource that local TF state no longer owns. Typical
+# cause: `make down`'s destroy loop hit a transient API error (SM token expiry,
+# 409 "Concurrent policy load") that the retry loop's state-emptiness check
+# could not see. Probe BOTH classes (SWA + Conjur) because they fail
+# independently. Surface BEFORE `make up` 409s. Warning only; never fails
+# doctor.
+if [[ -z "${PANW_SM_TENANT:-}" || -z "${CONCEAL_NAMESPACE:-}" ]]; then
+  printf '  [skip]    PANW_SM_TENANT or CONCEAL_NAMESPACE not set -- cannot probe tenant\n'
+elif ! command -v summon >/dev/null 2>&1; then
+  printf '  [skip]    summon not installed -- cannot mint SM token\n'
+else
+  # Returns two space-separated HTTP codes: "<swa_td_code> <conjur_branch_code>"
+  # or "ERR ERR" on token mint failure.
+  probe_out=$(summon -p conceal_summon \
+    --yaml "$(printf 'CLIENT_ID: !var %s/client_id\nCLIENT_SECRET: !var %s/client_secret' "$CONCEAL_NAMESPACE" "$CONCEAL_NAMESPACE")" \
+    -- bash -c '
+      set -euo pipefail
+      tok=$(./scripts/get-sm-token-b64.sh) || exit 99
+      base="https://${PANW_SM_TENANT}.secretsmgr.cyberark.cloud"
+      swa=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 \
+        "${base}/api/swa/trust-domains/idira.demo" \
+        -H "Authorization: Token token=\"$tok\"" \
+        -H "Accept: application/x.secretsmgr.v2+json")
+      cj=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 \
+        "${base}/api/resources/conjur/policy/data%2Fswa-demo" \
+        -H "Authorization: Token token=\"$tok\"")
+      echo "$swa $cj"
+    ' 2>/dev/null || echo "ERR ERR")
+  swa_code=${probe_out%% *}
+  cj_code=${probe_out##* }
+  # Local TF state -- a populated state means the tenant resources are owned,
+  # not orphaned. An empty state with any 200 is the failure mode we surface.
+  if [[ -f platform/terraform/terraform.tfstate ]]; then
+    tf_resources=$(jq '.resources | length' platform/terraform/terraform.tfstate 2>/dev/null || echo "?")
+  else
+    tf_resources=0
+  fi
+  if [[ "$swa_code" == "ERR" ]]; then
+    printf '  [warn]    could not mint SM token to probe -- network or credentials issue (not failing doctor)\n'
+  elif [[ "$swa_code" == "404" && "$cj_code" == "404" ]]; then
+    printf '  [ok]      no orphans on tenant (idira.demo + data/swa-demo absent)\n'
+  elif [[ "$swa_code" == "200" || "$cj_code" == "200" ]]; then
+    if [[ "$tf_resources" == "0" ]]; then
+      printf '  [warn]    tenant has orphans but local TF state is empty -- run `make clean-orphans`\n'
+      [[ "$swa_code" == "200" ]] && printf '              * swa trust_domain idira.demo\n'
+      [[ "$cj_code"  == "200" ]] && printf '              * conjur policy branch data/swa-demo\n'
+    else
+      printf '  [ok]      tenant resources present and owned by local TF state (%s resources)\n' "$tf_resources"
+    fi
+  else
+    printf '  [warn]    unexpected probe response: swa=%s conjur=%s -- not failing doctor\n' "$swa_code" "$cj_code"
+  fi
+fi
+
+echo
 if (( fail == 0 )); then
   echo 'All prerequisites satisfied.'
   exit 0

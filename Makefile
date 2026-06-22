@@ -26,7 +26,7 @@ SUMMON = summon -p conceal_summon --yaml "$$(printf 'CLIENT_ID: !var %s/client_i
 .DEFAULT_GOAL := help
 .PHONY: help setup doctor tf-token down install-tf-provider cluster images \
         tf-init tf-apply-platform install-server install-agent smoke-m1 \
-        up-m1 _check-env unpack migrate-from-1.0.4
+        up-m1 _check-env unpack migrate-from-1.0.4 clean-orphans
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z0-9_-]+:.*##/{printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -161,22 +161,92 @@ down: _check-env ## Tear down everything (cluster + tenant TF state). Best-effor
 	@# failure modes are transient -- re-running `make down` cleans them up.
 	@# Bake that retry into the recipe: up to 3 attempts, each gets a fresh
 	@# token, and we stop as soon as `terraform state list` is empty.
-	-@$(SUMMON) -- bash -c '\
-	  set -uo pipefail; \
-	  for attempt in 1 2 3; do \
-	    echo "==> tf destroy attempt $$attempt/3"; \
-	    tok=$$(./scripts/get-sm-token.sh); \
-	    CONJUR_APPLIANCE_URL=$(PANW_SM_URL) CONJUR_AUTHN_TOKEN=$$tok \
-	      $(TF) destroy -auto-approve -refresh=false -var sm_url=$(PANW_SM_URL) || true; \
-	    remaining=$$($(TF) state list 2>/dev/null | wc -l | tr -d " "); \
-	    echo "==> tf state remaining: $$remaining"; \
-	    if [ "$$remaining" = "0" ]; then break; fi; \
-	  done'
+	@# Loop body factored to scripts/tf-destroy-with-retry.sh so `clean-orphans`
+	@# reuses the same envelope.
+	-@PANW_SM_URL=$(PANW_SM_URL) $(SUMMON) -- ./scripts/tf-destroy-with-retry.sh
+	@# Post-destroy tenant check: the retry loop above breaks on local-state
+	@# emptiness, NOT on tenant cleanliness. Probe BOTH the SWA trust-domain
+	@# AND the conjur policy branch -- either can be orphaned independently
+	@# (token-expiry timing during destroy). Warning only; never blocks the
+	@# kind/kubectl teardown below.
+	-@PANW_SM_URL=$(PANW_SM_URL) $(SUMMON) -- bash -c '\
+	  tok=$$(./scripts/get-sm-token-b64.sh); \
+	  swa_code=$$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 \
+	    "$(PANW_SM_URL)/api/swa/trust-domains/idira.demo" \
+	    -H "Authorization: Token token=\"$$tok\"" \
+	    -H "Accept: application/x.secretsmgr.v2+json"); \
+	  cj_code=$$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 \
+	    "$(PANW_SM_URL)/api/resources/conjur/policy/data%2Fswa-demo" \
+	    -H "Authorization: Token token=\"$$tok\""); \
+	  if [ "$$swa_code" = "200" ] || [ "$$cj_code" = "200" ]; then \
+	    echo ""; \
+	    echo "WARN: tenant orphans remain after destroy:"; \
+	    [ "$$swa_code" = "200" ] && echo "        * swa trust_domain idira.demo present"; \
+	    [ "$$cj_code"  = "200" ] && echo "        * conjur policy branch data/swa-demo present"; \
+	    echo "      TF state is clean, so re-running \`make down\` will not help."; \
+	    echo "      Run \`make clean-orphans\` to reconcile."; \
+	  fi'
 	-kubectl delete -f platform/k8s/acme.service.yaml    --ignore-not-found
 	-kubectl delete -f platform/k8s/acme.deployment.yaml --ignore-not-found
 	-kubectl delete -f platform/k8s/acme.namespace.yaml  --ignore-not-found --wait=false
 	-kubectl delete ns swa-demo swa-system --wait=false 2>/dev/null
 	-kind delete cluster --name $(KIND_CLUSTER)
+
+# clean-orphans -- reconcile tenant-side resources that survived an aborted
+# `make down`. Symptom: `make up` fails with HTTP 409 (e.g.
+# "Conjur trust_domain with name 'idira.demo' already exists" or
+# "secureWorkloadAccess authenticator already exists") even though
+# `terraform state list` is empty. Recovery path: restore the managed
+# resource blocks from the May-27 snapshot backup into a working state,
+# then let the standard destroy-with-retry loop reconcile.
+#
+# Covers BOTH classes of orphan: SWA (trust_domain, server_group, node_group,
+# server) and Conjur (authenticator, policy_branch, secret, permission).
+# Both provider families treat DELETE-on-404 as idempotent success (verified
+# empirically), so destroying resources the tenant no longer has is harmless
+# -- meaning we always restore the full managed set regardless of which ones
+# are stranded today.
+#
+# Refuses to run if local state is non-empty (would clobber a live
+# deploy) or if the snapshot backup is missing (nothing to restore).
+CLEAN_ORPHANS_BACKUP := platform/terraform/terraform.tfstate.1779923863.backup
+clean-orphans: _check-env ## Reconcile tenant-side orphans (use when `make up` 409s on a clean local state)
+	@if [ "$$($(TF) state list 2>/dev/null | wc -l | tr -d ' ')" != "0" ]; then \
+	  echo "ERROR: terraform state is non-empty -- run \`make down\` first."; \
+	  $(TF) state list | sed 's/^/    /'; \
+	  exit 1; \
+	fi
+	@if [ ! -f $(CLEAN_ORPHANS_BACKUP) ]; then \
+	  echo "ERROR: $(CLEAN_ORPHANS_BACKUP) is missing"; \
+	  echo "       (this is the source of truth for orphan resource IDs)."; \
+	  exit 1; \
+	fi
+	@echo "==> backing up current (empty) state to terraform.tfstate.before-cleanup"
+	@cp platform/terraform/terraform.tfstate platform/terraform/terraform.tfstate.before-cleanup
+	@echo "==> building restore state with managed resources from the snapshot"
+	@# Filter rules:
+	@#  * drop data sources (mode != managed) -- -refresh=false makes them no-ops.
+	@#  * drop resources with empty instances (nothing to destroy).
+	@#  * drop conjur_* resources living under `data/swa/trust-domains/...` --
+	@#    those branches are owned by the SWA trust_domain and get cascaded
+	@#    when the trust_domain is destroyed. The cyberark/conjur provider
+	@#    hard-errors on DELETE-404, so leaving them in would jam the loop.
+	@jq '.resources |= map(select(.mode == "managed" and (.instances|length) > 0 and ((.type | startswith("conjur_") | not) or (((.instances[0].attributes.branch // "") | startswith("data/swa/trust-domains/") | not) and ((.instances[0].attributes.full_id // "") | startswith("data/swa/trust-domains/") | not))))) | .outputs = {}' \
+	  $(CLEAN_ORPHANS_BACKUP) \
+	  > platform/terraform/terraform.tfstate
+	@$(TF) state list | sed 's/^/    will attempt destroy: /'
+	@echo "==> invoking destroy-with-retry"
+	@if PANW_SM_URL=$(PANW_SM_URL) $(SUMMON) -- ./scripts/tf-destroy-with-retry.sh; then \
+	  echo "==> tenant reconciled; removing safety backup"; \
+	  rm platform/terraform/terraform.tfstate.before-cleanup; \
+	else \
+	  echo ""; \
+	  echo "ERROR: destroy did not empty state after 3 attempts."; \
+	  echo "       current (partial) state preserved; rollback with:"; \
+	  echo "         cp platform/terraform/terraform.tfstate.before-cleanup \\"; \
+	  echo "            platform/terraform/terraform.tfstate"; \
+	  exit 1; \
+	fi
 
 .PHONY: tf-apply-app build-ui build-apps deploy-apps smoke-m2 up-m2
 

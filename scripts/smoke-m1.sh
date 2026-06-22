@@ -127,24 +127,9 @@ fi
 
 step 'SaaS tenant has trust_domain=idira.demo (control-plane round-trip)'
 : "${CONCEAL_NAMESPACE:?set in .envrc (Keychain namespace holding client_id+client_secret)}"
-sm_b64_token=$(summon -p conceal_summon --yaml "$(printf 'CLIENT_ID: !var %s/client_id\nCLIENT_SECRET: !var %s/client_secret' "$CONCEAL_NAMESPACE" "$CONCEAL_NAMESPACE")" -- bash -c '
-  set -euo pipefail
-  identity_url=$(curl -fsSL --max-time 10 \
-    "https://platform-discovery.cyberark.cloud/api/v2/services/subdomain/${PANW_SM_TENANT}" \
-    | jq -er ".identity_administration.api")
-  identity_jwt=$(curl -fsSL --max-time 10 -X POST \
-    "${identity_url}/Oauth2/Token/__idaptive_cybr_user_oidc" \
-    -u "${CLIENT_ID}:${CLIENT_SECRET}" \
-    -H "Content-Type: application/x-www-form-urlencoded" \
-    --data-urlencode "grant_type=client_credentials" \
-    --data-urlencode "scope=api" \
-    | jq -er .access_token)
-  curl -fsSL --max-time 10 -X POST \
-    "https://${PANW_SM_TENANT}.secretsmgr.cyberark.cloud/api/authn-oidc/cyberark/conjur/authenticate" \
-    -H "Accept-Encoding: base64" \
-    -H "Content-Type: application/x-www-form-urlencoded" \
-    --data-urlencode "id_token=${identity_jwt}"
-')
+sm_b64_token=$(summon -p conceal_summon \
+  --yaml "$(printf 'CLIENT_ID: !var %s/client_id\nCLIENT_SECRET: !var %s/client_secret' "$CONCEAL_NAMESPACE" "$CONCEAL_NAMESPACE")" \
+  -- ./scripts/get-sm-token-b64.sh)
 
 td=$(curl -fsSL --max-time 10 \
   "$sm_base/api/swa/trust-domains/idira.demo" \
