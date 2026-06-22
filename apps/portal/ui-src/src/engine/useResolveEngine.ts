@@ -77,6 +77,13 @@ export function useResolveEngine(): ResolveEngine {
   // it into the error payload when mtls.handshake.err arrives (the backend
   // emits these as two separate SSE events).
   const peerUri = useRef<string | null>(null);
+  // Mirror of status, accessible from the pace-queue subscriber closure
+  // (which was registered once with [] deps and would otherwise see the
+  // initial render's value forever).
+  const statusRef = useRef<EngineStatus>("idle");
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   // Open the SSE connection once.
   useEffect(() => {
@@ -113,7 +120,6 @@ export function useResolveEngine(): ResolveEngine {
           payload: merged,
         });
         setStage(-1);
-        maxStage.current = -1;
         setStatus("error");
         return;
       }
@@ -126,6 +132,13 @@ export function useResolveEngine(): ResolveEngine {
           ttlTicker.setIssuedAndExp(iat, exp);
         }
       }
+
+      // After done/error, the visual state was set authoritatively by the
+      // HTTP response or by the error branch above. Late pace-queue drains
+      // MUST NOT rewind stage/completed -- otherwise a partial event stream
+      // (e.g. carrier /trace unreachable, so stages 2-4 never arrive) leaves
+      // the topology stuck on whatever the last late event index was.
+      if (statusRef.current !== "running") return;
 
       if (idx >= 0 && idx > maxStage.current) {
         maxStage.current = idx;
@@ -181,7 +194,6 @@ export function useResolveEngine(): ResolveEngine {
           setStatus("done");
           setStage(-1);
           setCompleted(6);
-          maxStage.current = -1;
         } else {
           // Non-OK HTTP means the carrier call failed. For external carrier
           // this is 502 (trust boundary rejection). The SSE error event
