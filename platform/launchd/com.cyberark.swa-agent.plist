@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.cyberark.swa-agent.plist -- LaunchAgent for the macOS swa-agent (M8.1).
+
+  Rendered into ${HOME}/Library/LaunchAgents/com.cyberark.swa-agent.plist by
+  scripts/install-laptop-agent.sh via envsubst. Variables expanded:
+    HOME -- Joe's home directory (absolute path; macOS launchd does not
+            expand ~ or shell variables inside plist string values, so the
+            paths below MUST be fully qualified at install time).
+
+  LaunchAgent (NOT LaunchDaemon): runs in the user's Aqua session, can
+  read the user's filesystem under ~/Library, and matches the security
+  model spec section 10.8 demands (the agent attests for the user, so it
+  must run as that user). Loaded with `launchctl bootstrap gui/$UID ...`.
+
+  RunAtLoad: start as soon as the agent is bootstrapped (on install).
+  KeepAlive (dict, SuccessfulExit=false): respawn on crash but NOT on
+  clean exit. The agent has no clean exit during normal operation; if it
+  does exit cleanly, that's a config error and we should not loop.
+  ThrottleInterval 10: minimum 10s between respawns to avoid tight loops
+  if the bootstrap server is unreachable.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.cyberark.swa-agent</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>${HOME}/.local/bin/swa-agent</string>
+    <string>run</string>
+    <string>--configDir</string>
+    <string>${HOME}/Library/Application Support/swa-agent</string>
+    <string>--configFile</string>
+    <string>agent.yaml</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>${HOME}</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardOutPath</key>
+  <string>${HOME}/Library/Logs/swa-agent.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>${HOME}/Library/Logs/swa-agent.log</string>
+</dict>
+</plist>

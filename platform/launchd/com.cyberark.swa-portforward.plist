@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.cyberark.swa-portforward.plist -- LaunchAgent for the kubectl
+  port-forward that exposes svc/swa-server:8443 on 127.0.0.1:18443 (M8.1).
+
+  Rendered into ${HOME}/Library/LaunchAgents by
+  scripts/install-laptop-agent.sh via envsubst. Variables expanded:
+    HOME -- Joe's home directory (absolute path; launchd does not expand
+            ~ inside plist string values).
+
+  Why a wrapper script (scripts/portforward-swa-server.sh) instead of
+  invoking kubectl directly: the wrapper writes a PID file so a stale
+  invocation can be detected on respawn, and binds explicitly to
+  127.0.0.1 (NOT 0.0.0.0) so the port is reachable only from the laptop
+  itself. See spec section 10.7 (port-forward death) and plan task 1.8.
+
+  KeepAlive true: if the port-forward dies (Mac sleep, kubelet blip,
+  kubectl upgrade), launchd respawns it. swa-agent retries its connection
+  to 127.0.0.1:18443 on failure, so a brief outage manifests as a delayed
+  JWT refresh, not a permanent failure.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.cyberark.swa-portforward</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>${HOME}/.local/bin/swa-portforward-wrapper.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>${HOME}</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!--
+      kubectl looks at PATH for itself plus uses HOME to find ~/.kube/config.
+      LaunchAgents inherit a minimal env from launchd; we set just enough
+      for kubectl + helm to resolve.
+    -->
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>HOME</key>
+    <string>${HOME}</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardOutPath</key>
+  <string>${HOME}/Library/Logs/swa-portforward.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>${HOME}/Library/Logs/swa-portforward.log</string>
+</dict>
+</plist>
