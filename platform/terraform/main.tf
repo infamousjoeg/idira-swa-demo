@@ -32,6 +32,17 @@ terraform {
       source  = "hashicorp/null"
       version = "~> 3.2"
     }
+    # tls provider: mints the x509pop self-signed cert/key used by the
+    # macOS swa-agent (M8.1) to attest to the in-cluster swa-server. See
+    # 60-laptop.tf. The cert is its own CA (is_ca_certificate = true) so
+    # the single PEM serves as both the agent's leaf credential and the
+    # swa_server_group.node_attestation.x509pop.ca_certificates bundle,
+    # giving effective allow-list semantics (only this cert chains to
+    # itself; nobody else holds the private key).
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
   }
 }
 
