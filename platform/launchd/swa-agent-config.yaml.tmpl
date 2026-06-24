@@ -1,0 +1,66 @@
+# swa-agent-config.yaml -- bootstrap config for the macOS swa-agent (M8.1).
+#
+# Rendered into ${HOME}/Library/Application Support/swa-agent/agent.yaml by
+# scripts/install-laptop-agent.sh via envsubst. Variables expanded:
+#   HOME                  -- Joe's home directory (absolute path)
+#   SWA_AGENT_CERT_PATH   -- absolute path to the x509pop cert PEM file
+#   SWA_AGENT_KEY_PATH    -- absolute path to the x509pop private key PEM file
+#
+# Schema keys derived from helm/swa-agent v0.1.0 chart's configmap (the
+# in-cluster DaemonSet uses the same shape). Verified against the actual
+# bundled chart on 2026-06-24; see Verified CLI flags prologue in the M8.1
+# plan for the full key reference.
+#
+# Connectivity: agent dials 127.0.0.1:18443, served by the LaunchAgent
+# com.cyberark.swa-portforward (kubectl port-forward to
+# svc/swa-server.swa-system:8443 inside the kind cluster). The port-forward
+# binds 127.0.0.1 only (not 0.0.0.0) per spec section 11.1.
+#
+# bootstrap.insecure=true: the swa-server's in-cluster TLS cert is signed
+# by an in-cluster CA that the macOS agent has no obvious way to import.
+# `insecure` here corresponds to "skip the server cert verification at the
+# initial bundle-fetch step"; once the agent is bootstrapped, the x509pop
+# attestation handshake provides mutual authentication. This is the same
+# default the in-cluster chart ships (bootstrap.insecure=false in cluster
+# because pods trust the cluster CA via SA token; not the case on a
+# laptop). Trade-off is documented in spec section 5.2 + 10.7 gotchas.
+
+trustDomain:
+  name: idira.demo
+
+bootstrap:
+  insecure: true
+
+servers:
+  - addr: 127.0.0.1:18443
+
+agent:
+  # Local health probe (loopback only). LaunchAgent log shows agent state
+  # transitions on this port; not exposed to other hosts.
+  healthAddr: 127.0.0.1:18082
+  # Workload API socket. Same path swa-agent api fetch defaults to via
+  # --socketPath inheritance. Co-located workload tools (here: only the
+  # jwt-refresh wrapper) connect here.
+  socketPath: ${HOME}/Library/Caches/swa-agent/public/api.sock
+
+  nodeAttestor:
+    # x509pop (Proof of Possession). Cert CN must match the node group
+    # name (joe-macbook-ng). Cert + key are mounted from filesystem -- the
+    # bundled agent does not (yet) read from macOS Keychain (verified via
+    # `strings ~/.local/bin/swa-agent | grep -i keychain` -> no matches).
+    # Files are written with mode 0600 by install-laptop-agent.sh.
+    type: x509pop
+    config:
+      cert: ${SWA_AGENT_CERT_PATH}
+      key:  ${SWA_AGENT_KEY_PATH}
+
+workload:
+  attestors:
+    # On macOS, the only relevant workload attestor is the unix plugin
+    # (selectors: uid/gid/path). The k8s plugin is compiled in but is
+    # specific to the in-cluster DaemonSet flow.
+    - type: unix
+
+telemetry:
+  logging:
+    level: info
